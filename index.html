@@ -216,8 +216,27 @@
       mac.takeoffTimer = 0;
       mac.landingTimer = 0;
 
+      mac.rolling = false;
+      mac.rollTimer = 0;
+
+      normalAttack.active = false;
+      normalAttack.timer = 0;
+      normalAttack.hitboxActive = false;
+
+      mac.castTimer = 0;
+      mac.castDuration = 0;
+      mac.castType = null;
+
       stopTongue();
       releaseGrapple();
+
+      // Reinicia a leitura visual para começar a transformação
+      // sempre no primeiro frame.
+      macAnim.frame = 0;
+      macAnim.timer = 0;
+      macAnim.seqPos = 0;
+      macAnim.locomotionPhase = 0;
+      macAnim.smoothedSpeed = 0;
     }
 
     function triggerSwallowAnimation(type) {
@@ -943,6 +962,16 @@
 
     function drawMacSprite() {
       if (!macAtlasReady) return;
+
+      if (
+        (
+          isWaterFormActive() ||
+          mac.waterTransformTimer > 0
+        ) &&
+        !aquaticAtlasReady
+      ) {
+        return;
+      }
 
       const visual =
         getMacVisualState();
@@ -1801,19 +1830,43 @@
           saveData.windCollected
         );
 
-      mac.waterPower =
-        Boolean(
-          saveData.waterPower
-        );
+      // Migração simples de saves antigos.
+      if (
+        saveData.activePower === "water"
+      ) {
+        waterFly.collected = true;
+      }
 
-      mac.windPower =
-        Boolean(
-          saveData.windPower
-        );
+      if (
+        saveData.activePower === "wind"
+      ) {
+        windFly.collected = true;
+      }
 
       mac.activePower =
         saveData.activePower ||
         null;
+
+      // Compatibilidade com saves das versões antigas.
+      // Se a mosca já foi coletada ou o HUD já dizia ÁGUA,
+      // o jogo reconhece corretamente a forma aquática.
+      mac.waterPower =
+        Boolean(
+          saveData.waterPower
+        ) ||
+        Boolean(
+          saveData.waterCollected
+        ) ||
+        mac.activePower === "water";
+
+      mac.windPower =
+        Boolean(
+          saveData.windPower
+        ) ||
+        Boolean(
+          saveData.windCollected
+        ) ||
+        mac.activePower === "wind";
 
       mac.doubleJumpUnlocked =
         Boolean(
@@ -1892,6 +1945,18 @@
             HEIGHT
         )
       );
+
+      if (
+        isWaterFormActive()
+      ) {
+        macAnim.state = "idle";
+        macAnim.frame = 0;
+        macAnim.timer = 0;
+        macAnim.seqPos = 0;
+        macAnim.locomotionPhase = 0;
+        macAnim.locomotionState = "idle";
+        macAnim.smoothedSpeed = 0;
+      }
 
       return true;
     }
@@ -2896,6 +2961,10 @@
     });
 
     function startRoll() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       mac.rolling = true;
       mac.rollTimer = mac.rollDuration;
 
@@ -2918,6 +2987,10 @@
     }
 
     function startTongue() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       tongue.active = true;
       tongue.length = 0;
       tongue.retracting = false;
@@ -3019,6 +3092,10 @@
     }
 
     function startNormalAttack() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       normalAttack.active = true;
       normalAttack.timer = 0;
       normalAttack.hitboxActive = false;
@@ -3051,6 +3128,10 @@
     }
 
     function fireWindBlade() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "wind",
         0.18
@@ -3080,6 +3161,10 @@
     }
 
     function startWindGust() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "wind",
         0.28
@@ -3094,6 +3179,10 @@
     }
 
     function startWindUltimate() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "wind",
         0.48
@@ -3118,6 +3207,10 @@
     }
 
     function fireWaterShot() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "water",
         0.18
@@ -3139,6 +3232,10 @@
     }
 
     function startWaterBurst() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "water",
         0.28
@@ -3151,6 +3248,10 @@
     }
 
     function startWaterUltimate() {
+      if (mac.waterTransformTimer > 0) {
+        return;
+      }
+
       triggerElementCast(
         "water",
         0.48
@@ -4466,6 +4567,24 @@
           mac.castTimer = 0;
           mac.castDuration = 0;
           mac.castType = null;
+        }
+      }
+
+      if (mac.waterTransformTimer > 0) {
+        mac.waterTransformTimer -= dt;
+
+        if (mac.waterTransformTimer <= 0) {
+          mac.waterTransformTimer = 0;
+
+          // Termina a transformação já estabilizado
+          // na forma aquática e devolve o controle ao jogador.
+          macAnim.state = "idle";
+          macAnim.frame = 0;
+          macAnim.timer = 0;
+          macAnim.seqPos = 0;
+          macAnim.locomotionPhase = 0;
+          macAnim.locomotionState = "idle";
+          macAnim.smoothedSpeed = 0;
         }
       }
 
@@ -6329,6 +6448,19 @@
         18,
         HEIGHT - 28
       );
+
+      if (
+        mac.waterTransformTimer > 0
+      ) {
+        ctx.font = "13px sans-serif";
+        ctx.fillStyle = "#8bdcff";
+
+        ctx.fillText(
+          "TRANSFORMAÇÃO AQUÁTICA",
+          18,
+          HEIGHT - 48
+        );
+      }
 
       ctx.font = "18px sans-serif";
 
