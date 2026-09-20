@@ -12,24 +12,19 @@ body {
 }
 
 body {
-  display: grid;
-  place-items: center;
-}
-
-.game-wrapper {
-  width: 100vw;
-  height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #game {
+  display: block;
+
   width: min(100vw, calc(100vh * 16 / 9));
   height: min(100vh, calc(100vw * 9 / 16));
-  display: block;
+
   background: #1b1b1b;
 
-  /* Mantém o visual nítido quando futuramente usarmos pixel art. */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
