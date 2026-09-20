@@ -134,20 +134,24 @@
       idle: { bottom: 657, strength: 0.25 },
       walk: { bottom: 650, strength: 0.45 },
       run: { bottom: 566, strength: 0.72 },
+      jump: { bottom: 640, strength: 0.30 },
       roll: { bottom: 559, strength: 0.58 },
-      tongue: { bottom: 618, strength: 0.35 }
+      tongue: { bottom: 618, strength: 0.62 },
+      grapple: { bottom: 620, strength: 0.42 },
+      swallowWater: { bottom: 628, strength: 0.42 },
+      swallowWind: { bottom: 628, strength: 0.42 }
     };
 
     const MAC_CENTER_STABILIZE = {
       idle: 0.42,
       walk: 0.52,
       run: 0.52,
-      jump: 0.28,
+      jump: 0.30,
       roll: 0.18,
-      tongue: 0.42,
-      grapple: 0.30,
-      swallowWater: 0.36,
-      swallowWind: 0.36
+      tongue: 0.62,
+      grapple: 0.42,
+      swallowWater: 0.46,
+      swallowWind: 0.46
     };
 
     const MAC_MOUTH_ANCHORS = {
@@ -155,20 +159,20 @@
       // not the full 104x156 box. This makes the tongue follow
       // the actual mouth on every frame.
       tongue: [
-        { x: 0.735, y: 0.145 },
-        { x: 0.748, y: 0.143 },
-        { x: 0.758, y: 0.140 },
-        { x: 0.765, y: 0.138 },
-        { x: 0.770, y: 0.137 },
-        { x: 0.760, y: 0.140 }
+        { x: 0.724, y: 0.160 },
+        { x: 0.738, y: 0.157 },
+        { x: 0.748, y: 0.153 },
+        { x: 0.756, y: 0.150 },
+        { x: 0.762, y: 0.149 },
+        { x: 0.752, y: 0.153 }
       ],
 
       grapple: [
-        { x: 0.675, y: 0.145 },
-        { x: 0.690, y: 0.140 },
-        { x: 0.705, y: 0.135 },
-        { x: 0.690, y: 0.140 },
-        { x: 0.675, y: 0.145 }
+        { x: 0.662, y: 0.162 },
+        { x: 0.676, y: 0.156 },
+        { x: 0.690, y: 0.149 },
+        { x: 0.676, y: 0.156 },
+        { x: 0.662, y: 0.162 }
       ]
     };
 
@@ -666,30 +670,47 @@
             )
           );
 
+        const eased =
+          tongue.retracting
+            ? Math.pow(
+                progress,
+                0.92
+              )
+            : Math.pow(
+                progress,
+                0.78
+              );
+
         const forward =
           [0, 1, 2, 3, 4, 5];
 
         const reverse =
           [5, 4, 3, 2, 1, 0];
 
-        const sequence =
-          tongue.retracting
-            ? reverse
-            : forward;
-
-        const index =
+        let index =
           Math.min(
-            sequence.length - 1,
+            forward.length - 1,
             Math.floor(
-              progress *
+              eased *
               (
-                sequence.length - 1
-              )
+                forward.length - 1
+              ) +
+              0.0001
             )
           );
 
+        if (
+          !tongue.retracting &&
+          tongue.contactHoldTimer > 0
+        ) {
+          index =
+            forward.length - 1;
+        }
+
         macAnim.frame =
-          sequence[index];
+          tongue.retracting
+            ? reverse[index]
+            : forward[index];
 
         validateMacAnimFrame();
         return;
@@ -777,275 +798,37 @@
     function drawMacSprite() {
       if (!macAtlasReady) return;
 
-      let state =
-        macAnim.state;
+      const visual =
+        getMacVisualState();
 
-      let frameIndex =
-        macAnim.frame;
-
-      let actionRotation = 0;
-      let actionX = 0;
-      let actionY = 0;
-
-      // Ataque normal:
-      // usa key poses do próprio Mac em vez de deixar
-      // o personagem totalmente parado.
-      if (normalAttack.active) {
-        const p =
-          Math.max(
-            0,
-            Math.min(
-              1,
-              normalAttack.timer /
-              normalAttack.duration
-            )
-          );
-
-        state = "walk";
-
-        if (p < 0.18) {
-          frameIndex = 1;
-          actionRotation =
-            -0.045 *
-            mac.facing;
-        } else if (p < 0.58) {
-          frameIndex = 3;
-          actionRotation =
-            0.11 *
-            mac.facing;
-
-          actionX =
-            3 *
-            mac.facing;
-        } else {
-          frameIndex = 5;
-          actionRotation =
-            0.035 *
-            mac.facing;
-
-          actionX =
-            1 *
-            mac.facing;
-        }
-      } else if (
-        mac.castTimer > 0 &&
-        mac.castType
-      ) {
-        const p =
-          1 -
-          mac.castTimer /
-          Math.max(
-            0.001,
-            mac.castDuration
-          );
-
-        if (
-          mac.castType ===
-          "water"
-        ) {
-          state = "tongue";
-
-          frameIndex =
-            p < 0.25
-              ? 0
-              : p < 0.72
-                ? 1
-                : 0;
-
-          actionX =
-            2 *
-            mac.facing;
-        } else {
-          state = "jump";
-
-          frameIndex =
-            p < 0.28
-              ? 1
-              : p < 0.72
-                ? 2
-                : 3;
-
-          actionRotation =
-            -0.045 *
-            mac.facing;
-        }
-      }
-
-      const frames =
-        MAC_ATLAS_META[
-          state
-        ];
-
-      const safeFrameIndex =
-        Math.max(
-          0,
-          Math.min(
-            frames.length - 1,
-            Number.isFinite(
-              frameIndex
-            )
-              ? Math.floor(
-                  frameIndex
-                )
-              : 0
-          )
+      const info =
+        getMacRenderInfo(
+          visual
         );
 
-      const frame =
-        frames[
-          safeFrameIndex
-        ];
-
-      if (!frame) {
+      if (!info) {
         return;
       }
 
-      const source =
-        MAC_SOURCE_SIZE[
-          state
-        ];
-
-      const cfg =
-        MAC_DRAW[
-          state
-        ] ||
-        MAC_DRAW.idle;
-
-      const uniformScale =
-        Math.min(
-          cfg.height /
-            source.h,
-          cfg.width /
-            source.w
-        );
-
-      const renderedCellWidth =
-        source.w *
-        uniformScale;
-
-      const cellOffsetX =
-        (
-          cfg.width -
-          renderedCellWidth
-        ) / 2;
-
-      const lead =
-        mac.facing === 1
-          ? cfg.leadX
-          : -cfg.leadX;
-
-      const baseX =
-        mac.x +
-        mac.width / 2 -
-        cfg.width / 2 +
-        lead +
-        actionX;
-
-      const baseY =
-        mac.y +
-        mac.height -
-        cfg.height +
-        cfg.yOffset +
-        actionY;
-
-      const frameCenter =
-        frame.ox +
-        frame.w / 2;
-
-      const sourceCenter =
-        source.w / 2;
-
-      const stabilizeStrength =
-        MAC_CENTER_STABILIZE[
-          state
-        ] ?? 0.35;
-
-      const centerCorrectionX =
-        (
-          sourceCenter -
-          frameCenter
-        ) *
-        uniformScale *
-        stabilizeStrength;
-
-      const dx =
-        Math.round(
-          baseX +
-          cellOffsetX +
-          frame.ox *
-            uniformScale +
-          centerCorrectionX
-        );
-
-      // A parte visível de cada frame é ancorada pelo pé.
-      // Assim o sprite nunca "flutua" acima da hitbox/chão.
-      let spriteTopY =
-        mac.y +
-        mac.height -
-        frame.h *
-          uniformScale +
-        actionY;
-
-      if (
-        state === "run" &&
-        MAC_FRAME_BASELINES.run
-      ) {
-        const baseline =
-          MAC_FRAME_BASELINES.run;
-
-        const sourceBaselineTop =
-          mac.y +
-          mac.height -
-          (
-            baseline.bottom -
-            frame.oy
-          ) *
-          uniformScale +
-          actionY;
-
-        spriteTopY =
-          spriteTopY +
-          (
-            sourceBaselineTop -
-            spriteTopY
-          ) *
-          baseline.strength;
-      }
-
-      const dy =
-        Math.round(
-          spriteTopY
-        );
-
-      const dw =
-        Math.ceil(
-          frame.w *
-          uniformScale
-        );
-
-      const dh =
-        Math.ceil(
-          frame.h *
-          uniformScale
-        );
+      const {
+        state,
+        frame,
+        cfg,
+        baseX,
+        baseY,
+        dx,
+        dy,
+        dw,
+        dh,
+        pivotX,
+        pivotY
+      } = info;
 
       const tint =
         getMacTint();
 
-      const pivotX =
-        Math.round(
-          baseX +
-          cfg.width / 2
-        );
-
-      const pivotY =
-        Math.round(
-          baseY +
-          cfg.height * 0.72
-        );
-
       let extraRotation =
-        actionRotation;
+        visual.actionRotation;
 
       let extraYOffset = 0;
 
@@ -1066,8 +849,6 @@
             mac.rollDuration
           );
 
-        // O próprio sprite já contém a rotação.
-        // Só um pequeno arco vertical para dar peso.
         extraYOffset +=
           Math.sin(
             progress *
@@ -1078,8 +859,6 @@
         macAnim.state ===
         "grapple"
       ) {
-        // O corpo acompanha a velocidade angular
-        // em vez de só olhar para a posição.
         const angularLean =
           Math.max(
             -0.16,
@@ -1177,13 +956,8 @@
           frame.y,
           frame.w,
           frame.h,
-          cellOffsetX +
-            frame.ox *
-            uniformScale +
-            centerCorrectionX,
-          cfg.height -
-            frame.h *
-            uniformScale,
+          dx - baseX,
+          dy - baseY,
           dw,
           dh
         );
@@ -4999,67 +4773,172 @@
     }
 
 
-    function getVisualTongueOrigin() {
+    function getMacVisualState() {
+      let state =
+        macAnim.state;
+
+      let frameIndex =
+        macAnim.frame;
+
+      let actionRotation = 0;
+      let actionX = 0;
+      let actionY = 0;
+
+      if (normalAttack.active) {
+        const p =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              normalAttack.timer /
+              normalAttack.duration
+            )
+          );
+
+        state = "walk";
+
+        if (p < 0.18) {
+          frameIndex = 1;
+          actionRotation =
+            -0.045 *
+            mac.facing;
+        } else if (p < 0.58) {
+          frameIndex = 3;
+          actionRotation =
+            0.11 *
+            mac.facing;
+
+          actionX =
+            3 *
+            mac.facing;
+        } else {
+          frameIndex = 5;
+          actionRotation =
+            0.035 *
+            mac.facing;
+
+          actionX =
+            1 *
+            mac.facing;
+        }
+      } else if (
+        mac.castTimer > 0 &&
+        mac.castType
+      ) {
+        const p =
+          1 -
+          mac.castTimer /
+          Math.max(
+            0.001,
+            mac.castDuration
+          );
+
+        if (
+          mac.castType ===
+          "water"
+        ) {
+          state = "tongue";
+
+          frameIndex =
+            p < 0.25
+              ? 0
+              : p < 0.72
+                ? 1
+                : 0;
+
+          actionX =
+            2 *
+            mac.facing;
+        } else {
+          state = "jump";
+
+          frameIndex =
+            p < 0.28
+              ? 1
+              : p < 0.72
+                ? 2
+                : 3;
+
+          actionRotation =
+            -0.045 *
+            mac.facing;
+        }
+      }
+
+      return {
+        state,
+        frameIndex,
+        actionRotation,
+        actionX,
+        actionY
+      };
+    }
+
+    function getMacRenderInfo(visualState = null) {
+      const visual =
+        visualState ||
+        getMacVisualState();
+
       const state =
-        grapple.active
-          ? "grapple"
-          : "tongue";
+        visual.state;
 
       const frames =
-        MAC_ATLAS_META[state];
+        MAC_ATLAS_META[
+          state
+        ];
 
-      const safeIndex =
+      const safeFrameIndex =
         Math.max(
           0,
           Math.min(
             frames.length - 1,
-            Number.isFinite(macAnim.frame)
-              ? Math.floor(macAnim.frame)
+            Number.isFinite(
+              visual.frameIndex
+            )
+              ? Math.floor(
+                  visual.frameIndex
+                )
               : 0
           )
         );
 
       const frame =
-        frames[safeIndex];
+        frames[
+          safeFrameIndex
+        ];
+
+      if (!frame) {
+        return null;
+      }
 
       const source =
-        MAC_SOURCE_SIZE[state];
+        MAC_SOURCE_SIZE[
+          state
+        ];
 
       const cfg =
-        MAC_DRAW[state];
+        MAC_DRAW[
+          state
+        ] ||
+        MAC_DRAW.idle;
 
       const uniformScale =
         Math.min(
-          cfg.height / source.h,
-          cfg.width / source.w
+          cfg.height /
+            source.h,
+          cfg.width /
+            source.w
         );
 
       const renderedCellWidth =
-        source.w * uniformScale;
+        source.w *
+        uniformScale;
 
       const cellOffsetX =
         (
           cfg.width -
           renderedCellWidth
         ) / 2;
-
-      const frameCenter =
-        frame.ox +
-        frame.w / 2;
-
-      const sourceCenter =
-        source.w / 2;
-
-      const stabilizeStrength =
-        MAC_CENTER_STABILIZE[state] ?? 0.35;
-
-      const centerCorrectionX =
-        (
-          sourceCenter -
-          frameCenter
-        ) *
-        uniformScale *
-        stabilizeStrength;
 
       const lead =
         mac.facing === 1
@@ -5070,42 +4949,163 @@
         mac.x +
         mac.width / 2 -
         cfg.width / 2 +
-        lead;
+        lead +
+        visual.actionX;
 
-      const frameLeft =
-        baseX +
-        cellOffsetX +
-        frame.ox *
-        uniformScale +
-        centerCorrectionX;
+      const baseY =
+        mac.y +
+        mac.height -
+        cfg.height +
+        cfg.yOffset +
+        visual.actionY;
 
-      const frameTop =
+      const frameCenter =
+        frame.ox +
+        frame.w / 2;
+
+      const sourceCenter =
+        source.w / 2;
+
+      const stabilizeStrength =
+        MAC_CENTER_STABILIZE[
+          state
+        ] ?? 0.35;
+
+      const centerCorrectionX =
+        (
+          sourceCenter -
+          frameCenter
+        ) *
+        uniformScale *
+        stabilizeStrength;
+
+      let spriteTopY =
         mac.y +
         mac.height -
         frame.h *
-        uniformScale;
+          uniformScale +
+        visual.actionY;
+
+      const baselineRule =
+        MAC_FRAME_BASELINES[
+          state
+        ];
+
+      if (
+        baselineRule
+      ) {
+        const sourceBaselineTop =
+          mac.y +
+          mac.height -
+          (
+            baselineRule.bottom -
+            frame.oy
+          ) *
+          uniformScale +
+          visual.actionY;
+
+        spriteTopY =
+          spriteTopY +
+          (
+            sourceBaselineTop -
+            spriteTopY
+          ) *
+          baselineRule.strength;
+      }
+
+      const dx =
+        Math.round(
+          baseX +
+          cellOffsetX +
+          frame.ox *
+            uniformScale +
+          centerCorrectionX
+        );
+
+      const dy =
+        Math.round(
+          spriteTopY
+        );
+
+      const dw =
+        Math.ceil(
+          frame.w *
+          uniformScale
+        );
+
+      const dh =
+        Math.ceil(
+          frame.h *
+          uniformScale
+        );
+
+      const pivotX =
+        Math.round(
+          baseX +
+          cfg.width / 2
+        );
+
+      const pivotY =
+        Math.round(
+          baseY +
+          cfg.height * 0.72
+        );
+
+      return {
+        visual,
+        state,
+        safeFrameIndex,
+        frame,
+        source,
+        cfg,
+        uniformScale,
+        baseX,
+        baseY,
+        dx,
+        dy,
+        dw,
+        dh,
+        pivotX,
+        pivotY
+      };
+    }
+
+    function getVisualTongueOrigin() {
+      const visual =
+        getMacVisualState();
+
+      const info =
+        getMacRenderInfo(
+          visual
+        );
+
+      if (!info) {
+        return getTongueOrigin();
+      }
+
+      const state =
+        grapple.active
+          ? "grapple"
+          : "tongue";
 
       const anchorList =
-        MAC_MOUTH_ANCHORS[state];
+        MAC_MOUTH_ANCHORS[
+          state
+        ];
+
+      const safeAnchorIndex =
+        Math.max(
+          0,
+          Math.min(
+            anchorList.length - 1,
+            info.safeFrameIndex
+          )
+        );
 
       const anchor =
         anchorList[
-          Math.max(
-            0,
-            Math.min(
-              anchorList.length - 1,
-              safeIndex
-            )
-          )
+          safeAnchorIndex
         ];
-
-      const visibleWidth =
-        frame.w *
-        uniformScale;
-
-      const visibleHeight =
-        frame.h *
-        uniformScale;
 
       const anchorX =
         mac.facing === 1
@@ -5115,16 +5115,15 @@
       return {
         x:
           Math.round(
-            frameLeft +
-            visibleWidth *
-            anchorX
+            info.dx +
+            info.dw *
+              anchorX
           ),
-
         y:
           Math.round(
-            frameTop +
-            visibleHeight *
-            anchor.y
+            info.dy +
+            info.dh *
+              anchor.y
           )
       };
     }
@@ -5169,25 +5168,17 @@
     }
 
     function drawTongue() {
-      if (!tongue.active || tongue.length <= 0 || grapple.active) {
+      if (
+        !tongue.active ||
+        tongue.length <= 0 ||
+        grapple.active
+      ) {
         return;
       }
 
       const origin =
         getVisualTongueOrigin();
 
-      const physicsOrigin =
-        getTongueOrigin();
-
-      // O início é a boca do sprite.
-      // O final é exatamente o ponto usado pela colisão física.
-      const endX =
-        physicsOrigin.x +
-        tongue.length *
-        mac.facing;
-      const holdBump = tongue.contactHoldTimer > 0 ? 1 : 0;
-      const ctrlX1 = origin.x + (endX - origin.x) * 0.28;
-      const ctrlX2 = origin.x + (endX - origin.x) * 0.72;
       const lengthRatio =
         Math.max(
           0,
@@ -5201,11 +5192,44 @@
           )
         );
 
+      const endX =
+        origin.x +
+        tongue.length *
+        mac.facing;
+
+      const endY =
+        Math.round(
+          origin.y +
+          (
+            tongue.retracting
+              ? 0.6
+              : -0.8
+          ) *
+          lengthRatio
+        );
+
+      const holdBump =
+        tongue.contactHoldTimer > 0
+          ? 1
+          : 0;
+
+      const ctrlX1 =
+        origin.x +
+        (
+          endX - origin.x
+        ) * 0.26;
+
+      const ctrlX2 =
+        origin.x +
+        (
+          endX - origin.x
+        ) * 0.74;
+
       const curveLift =
         (
           tongue.retracting
-            ? 0.8
-            : -2.2
+            ? 0.7
+            : -2.0
         ) *
         lengthRatio;
 
@@ -5215,65 +5239,125 @@
         holdBump;
 
       const ctrlY2 =
-        origin.y +
-        curveLift * 0.72 -
+        endY +
+        curveLift * 0.45 -
         holdBump;
 
-      const half =
+      const startRadius =
+        3.3;
+      const endRadius =
+        4.1;
+      const bodyThickness =
         tongue.thickness *
         (
-          0.46 +
-          0.06 *
+          0.40 +
+          0.08 *
           lengthRatio
         );
-      const dir = mac.facing;
-      const tipBaseX = endX - dir * 6;
 
-      const tonguePath = new Path2D();
-      tonguePath.moveTo(origin.x, origin.y - half);
-      tonguePath.bezierCurveTo(
-        ctrlX1,
-        ctrlY1 - half * 0.30,
-        ctrlX2,
-        ctrlY2 - half * 0.20,
-        tipBaseX,
-        origin.y - half * 0.24
-      );
-      tonguePath.lineTo(endX, origin.y);
-      tonguePath.lineTo(tipBaseX, origin.y + half * 0.24);
-      tonguePath.bezierCurveTo(
-        ctrlX2,
-        ctrlY2 + half * 0.20,
-        ctrlX1,
-        ctrlY1 + half * 0.30,
+      const dir =
+        mac.facing;
+
+      const tipBaseX =
+        endX - dir * 6;
+
+      const tonguePath =
+        new Path2D();
+
+      tonguePath.moveTo(
         origin.x,
-        origin.y + half
+        origin.y - startRadius
       );
+
+      tonguePath.bezierCurveTo(
+        ctrlX1,
+        ctrlY1 - bodyThickness,
+        ctrlX2,
+        ctrlY2 - bodyThickness * 0.72,
+        tipBaseX,
+        endY - endRadius * 0.45
+      );
+
+      tonguePath.lineTo(
+        endX,
+        endY
+      );
+
+      tonguePath.lineTo(
+        tipBaseX,
+        endY + endRadius * 0.45
+      );
+
+      tonguePath.bezierCurveTo(
+        ctrlX2,
+        ctrlY2 + bodyThickness * 0.72,
+        ctrlX1,
+        ctrlY1 + bodyThickness,
+        origin.x,
+        origin.y + startRadius
+      );
+
       tonguePath.closePath();
 
       ctx.save();
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      ctx.fillStyle = "#ff7ea8";
-      ctx.fill(tonguePath);
+      ctx.fillStyle =
+        "#ff7ea8";
+      ctx.fill(
+        tonguePath
+      );
 
-      ctx.strokeStyle = "#6b1f3d";
+      ctx.strokeStyle =
+        "#6b1f3d";
       ctx.lineWidth = 2;
-      ctx.stroke(tonguePath);
+      ctx.stroke(
+        tonguePath
+      );
 
-      ctx.fillStyle = "#ff9abc";
+      // Boca: cobre a emenda para a língua parecer sair de dentro da boca.
+      ctx.fillStyle =
+        "#6b1f3d";
       ctx.beginPath();
-      ctx.arc(Math.round(endX), Math.round(origin.y), 4.4, 0, Math.PI * 2);
+      ctx.arc(
+        origin.x,
+        origin.y,
+        2.6,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
-      ctx.strokeStyle = "#6b1f3d";
-      ctx.lineWidth = 1.4;
+
+      ctx.fillStyle =
+        "#ff86ae";
+      ctx.beginPath();
+      ctx.arc(
+        origin.x + dir * 1.6,
+        origin.y,
+        2.4,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Ponta mais arredondada.
+      ctx.fillStyle =
+        "#ff9abc";
+      ctx.beginPath();
+      ctx.arc(
+        Math.round(endX),
+        Math.round(endY),
+        endRadius,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      ctx.strokeStyle =
+        "#6b1f3d";
+      ctx.lineWidth = 1.35;
       ctx.stroke();
-
-      ctx.fillStyle = "#d87090";
-      ctx.beginPath();
-      ctx.arc(origin.x, origin.y, 3.0, 0, Math.PI * 2);
-      ctx.fill();
 
       ctx.restore();
     }
@@ -6001,7 +6085,7 @@
       ctx.fillStyle = "rgba(255,255,255,0.66)";
 
       ctx.fillText(
-        "R: reiniciar do começo",
+        "R: reiniciar | língua revisada e sprites unificados",
         18,
         HEIGHT - 28
       );
