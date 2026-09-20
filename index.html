@@ -39,37 +39,45 @@
       state: "idle",
       frame: 0,
       timer: 0,
-      seqPos: 0
+      seqPos: 0,
+      smoothedSpeed: 0,
+      locomotionState: "idle",
+      lastLocomotionState: "idle"
+    };
+
+    const MAC_SPRITE_BOX = {
+      width: 104,
+      height: 156
     };
 
     const MAC_DRAW = {
-      idle: { width: 88, height: 146, leadX: 0, yOffset: 0 },
-      walk: { width: 90, height: 148, leadX: 1, yOffset: 0 },
-      run: { width: 92, height: 146, leadX: 3, yOffset: 0 },
-      jump: { width: 90, height: 148, leadX: 1, yOffset: 0 },
-      roll: { width: 78, height: 84, leadX: 0, yOffset: -4 },
-      tongue: { width: 94, height: 150, leadX: 2, yOffset: 0 },
-      grapple: { width: 108, height: 162, leadX: 0, yOffset: -1 },
-      swallowWater: { width: 90, height: 148, leadX: 0, yOffset: 0 },
-      swallowWind: { width: 90, height: 148, leadX: 0, yOffset: 0 }
+      idle: { width: 104, height: 156, leadX: 0, yOffset: 0 },
+      walk: { width: 104, height: 156, leadX: 1, yOffset: 0 },
+      run: { width: 104, height: 156, leadX: 2, yOffset: 0 },
+      jump: { width: 104, height: 156, leadX: 1, yOffset: 0 },
+      roll: { width: 104, height: 156, leadX: 0, yOffset: 0 },
+      tongue: { width: 104, height: 156, leadX: 2, yOffset: 0 },
+      grapple: { width: 104, height: 156, leadX: 0, yOffset: 0 },
+      swallowWater: { width: 104, height: 156, leadX: 0, yOffset: 0 },
+      swallowWind: { width: 104, height: 156, leadX: 0, yOffset: 0 }
     };
 
     const MAC_MOUTH_ANCHORS = {
       tongue: [
-        { x: 0.665, y: 0.315 },
-        { x: 0.680, y: 0.310 },
-        { x: 0.695, y: 0.304 },
-        { x: 0.705, y: 0.299 },
-        { x: 0.712, y: 0.296 },
-        { x: 0.702, y: 0.300 }
+        { x: 0.660, y: 0.315 },
+        { x: 0.674, y: 0.309 },
+        { x: 0.687, y: 0.304 },
+        { x: 0.698, y: 0.300 },
+        { x: 0.705, y: 0.298 },
+        { x: 0.698, y: 0.301 }
       ],
 
       grapple: [
-        { x: 0.590, y: 0.300 },
-        { x: 0.604, y: 0.288 },
-        { x: 0.616, y: 0.280 },
-        { x: 0.604, y: 0.288 },
-        { x: 0.592, y: 0.300 }
+        { x: 0.580, y: 0.308 },
+        { x: 0.592, y: 0.298 },
+        { x: 0.604, y: 0.292 },
+        { x: 0.592, y: 0.298 },
+        { x: 0.580, y: 0.308 }
       ]
     };
 
@@ -82,6 +90,20 @@
     const macTintCtx = macTintCanvas.getContext("2d");
     macTintCtx.imageSmoothingEnabled = false;
 
+    function triggerElementCast(
+      type,
+      duration = 0.22
+    ) {
+      mac.castType =
+        type;
+
+      mac.castDuration =
+        duration;
+
+      mac.castTimer =
+        duration;
+    }
+
     function triggerSwallowAnimation(type) {
       mac.swallowType = type;
       mac.swallowTimer = mac.swallowDuration;
@@ -90,10 +112,40 @@
 
     function setMacAnimState(state) {
       if (macAnim.state === state) return;
+
+      const prevState = macAnim.state;
+      const prevSeq = macAnim.seqPos;
+      const locomotion = new Set(["idle", "walk", "run"]);
+
       macAnim.state = state;
       macAnim.frame = 0;
       macAnim.timer = 0;
-      macAnim.seqPos = 0;
+
+      if (prevState === "walk" && state === "run") {
+        macAnim.seqPos = prevSeq % 8;
+      } else if (prevState === "run" && state === "walk") {
+        macAnim.seqPos = prevSeq % 8;
+      } else if (!(locomotion.has(prevState) && locomotion.has(state))) {
+        macAnim.seqPos = 0;
+      }
+    }
+
+    function getLocomotionState(rawSpeed) {
+      macAnim.smoothedSpeed += (rawSpeed - macAnim.smoothedSpeed) * 0.20;
+      const speed = macAnim.smoothedSpeed;
+      const current = macAnim.locomotionState;
+
+      if (current === "idle") {
+        if (speed > 215) macAnim.locomotionState = "run";
+        else if (speed > 18) macAnim.locomotionState = "walk";
+      } else if (current === "walk") {
+        if (speed < 10) macAnim.locomotionState = "idle";
+        else if (speed > 255) macAnim.locomotionState = "run";
+      } else if (current === "run") {
+        if (speed < 185) macAnim.locomotionState = "walk";
+      }
+
+      return macAnim.locomotionState;
     }
 
     function getMacAnimState() {
@@ -106,9 +158,7 @@
       if (!mac.grounded || mac.landingTimer > 0) return "jump";
 
       const speed = Math.abs(mac.vx);
-      if (speed > 250) return "run";
-      if (speed > 14) return "walk";
-      return "idle";
+      return getLocomotionState(speed);
     }
 
     function advanceSequence(dt, sequence, durations, speedScale = 1) {
@@ -132,41 +182,44 @@
       setMacAnimState(state);
 
       const count = MAC_ATLAS_META[state].length;
-      const speed = Math.abs(mac.vx);
+      const rawSpeed = Math.abs(mac.vx);
+      const speed = macAnim.smoothedSpeed;
 
       if (state === "idle") {
         advanceSequence(
           dt,
           [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1],
-          [0.12, 0.11, 0.10, 0.09, 0.10, 0.11, 0.12, 0.14, 0.12, 0.11, 0.10, 0.09, 0.10, 0.11]
+          [0.13, 0.11, 0.10, 0.095, 0.10, 0.11, 0.12, 0.14, 0.12, 0.11, 0.10, 0.095, 0.10, 0.11]
         );
         return;
       }
 
       if (state === "walk") {
-        const walkScale = 0.92 + Math.min(0.40, speed / Math.max(1, mac.walkSpeed) * 0.40);
+        const walkScale = 0.92 + Math.min(0.34, speed / Math.max(1, mac.walkSpeed) * 0.34);
         advanceSequence(
           dt,
           [0, 1, 2, 3, 4, 5, 6, 7],
-          [0.11, 0.08, 0.07, 0.08, 0.11, 0.08, 0.07, 0.08],
+          [0.115, 0.085, 0.072, 0.082, 0.115, 0.085, 0.072, 0.082],
           walkScale
         );
         return;
       }
 
       if (state === "run") {
-        const runScale = 1.02 + Math.min(0.48, speed / Math.max(1, mac.runSpeed) * 0.48);
+        const runScale = 0.98 + Math.min(0.42, speed / Math.max(1, mac.runSpeed) * 0.42);
         advanceSequence(
           dt,
           [0, 1, 2, 3, 4, 5, 6, 7],
-          [0.09, 0.06, 0.055, 0.06, 0.09, 0.06, 0.055, 0.06],
+          [0.092, 0.068, 0.058, 0.064, 0.092, 0.068, 0.058, 0.064],
           runScale
         );
         return;
       }
 
       if (state === "jump") {
-        if (mac.landingTimer > 0) {
+        if (mac.takeoffTimer > 0) {
+          macAnim.frame = 0;
+        } else if (mac.landingTimer > 0) {
           macAnim.frame = count - 1;
         } else if (mac.vy < -430) {
           macAnim.frame = 0;
@@ -185,7 +238,7 @@
       }
 
       if (state === "roll") {
-        const sequence = [0, 1, 1, 2, 3, 4, 4, 5, 4, 3];
+        const sequence = [0, 1, 1, 2, 3, 4, 5, 5, 4, 3, 2];
         const progress = 1 - Math.max(0, mac.rollTimer) / mac.rollDuration;
         macAnim.frame = sequence[
           Math.min(sequence.length - 1, Math.floor(progress * sequence.length))
@@ -235,55 +288,376 @@
     function drawMacSprite() {
       if (!macAtlasReady) return;
 
-      const state = macAnim.state;
-      const frames = MAC_ATLAS_META[state];
-      const frame = frames[Math.max(0, Math.min(frames.length - 1, macAnim.frame))];
-      const source = MAC_SOURCE_SIZE[state];
-      const cfg = MAC_DRAW[state] || MAC_DRAW.idle;
+      let state =
+        macAnim.state;
 
-      const scaleX = cfg.width / source.w;
-      const scaleY = cfg.height / source.h;
+      let frameIndex =
+        macAnim.frame;
 
-      const lead = mac.facing === 1 ? cfg.leadX : -cfg.leadX;
+      let actionRotation = 0;
+      let actionX = 0;
+      let actionY = 0;
 
-      const baseX = mac.x + mac.width / 2 - cfg.width / 2 + lead;
-      const baseY = mac.y + mac.height - cfg.height + cfg.yOffset;
+      // Ataque normal:
+      // usa key poses do próprio Mac em vez de deixar
+      // o personagem totalmente parado.
+      if (normalAttack.active) {
+        const p =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              normalAttack.timer /
+              normalAttack.duration
+            )
+          );
 
-      const dx = Math.round(baseX + frame.ox * scaleX);
-      const dy = Math.round(baseY + frame.oy * scaleY);
-      const dw = Math.ceil(frame.w * scaleX);
-      const dh = Math.ceil(frame.h * scaleY);
+        state = "walk";
 
-      const tint = getMacTint();
+        if (p < 0.18) {
+          frameIndex = 1;
+          actionRotation =
+            -0.045 *
+            mac.facing;
+        } else if (p < 0.58) {
+          frameIndex = 3;
+          actionRotation =
+            0.11 *
+            mac.facing;
+
+          actionX =
+            3 *
+            mac.facing;
+        } else {
+          frameIndex = 5;
+          actionRotation =
+            0.035 *
+            mac.facing;
+
+          actionX =
+            1 *
+            mac.facing;
+        }
+      } else if (
+        mac.castTimer > 0 &&
+        mac.castType
+      ) {
+        const p =
+          1 -
+          mac.castTimer /
+          Math.max(
+            0.001,
+            mac.castDuration
+          );
+
+        if (
+          mac.castType ===
+          "water"
+        ) {
+          state = "tongue";
+
+          frameIndex =
+            p < 0.25
+              ? 0
+              : p < 0.72
+                ? 1
+                : 0;
+
+          actionX =
+            2 *
+            mac.facing;
+        } else {
+          state = "jump";
+
+          frameIndex =
+            p < 0.28
+              ? 1
+              : p < 0.72
+                ? 2
+                : 3;
+
+          actionRotation =
+            -0.045 *
+            mac.facing;
+        }
+      }
+
+      const frames =
+        MAC_ATLAS_META[
+          state
+        ];
+
+      const frame =
+        frames[
+          Math.max(
+            0,
+            Math.min(
+              frames.length - 1,
+              frameIndex
+            )
+          )
+        ];
+
+      const source =
+        MAC_SOURCE_SIZE[
+          state
+        ];
+
+      const cfg =
+        MAC_DRAW[
+          state
+        ] ||
+        MAC_DRAW.idle;
+
+      const scaleX =
+        cfg.width /
+        source.w;
+
+      const scaleY =
+        cfg.height /
+        source.h;
+
+      const lead =
+        mac.facing === 1
+          ? cfg.leadX
+          : -cfg.leadX;
+
+      const baseX =
+        mac.x +
+        mac.width / 2 -
+        cfg.width / 2 +
+        lead +
+        actionX;
+
+      const baseY =
+        mac.y +
+        mac.height -
+        cfg.height +
+        cfg.yOffset +
+        actionY;
+
+      const dx =
+        Math.round(
+          baseX +
+          frame.ox *
+            scaleX
+        );
+
+      const dy =
+        Math.round(
+          baseY +
+          frame.oy *
+            scaleY
+        );
+
+      const dw =
+        Math.ceil(
+          frame.w *
+          scaleX
+        );
+
+      const dh =
+        Math.ceil(
+          frame.h *
+          scaleY
+        );
+
+      const tint =
+        getMacTint();
+
+      const pivotX =
+        Math.round(
+          baseX +
+          cfg.width / 2
+        );
+
+      const pivotY =
+        Math.round(
+          baseY +
+          cfg.height * 0.72
+        );
+
+      let extraRotation =
+        actionRotation;
+
+      let extraYOffset = 0;
+
+      if (
+        macAnim.state ===
+        "roll" &&
+        !normalAttack.active &&
+        mac.castTimer <= 0
+      ) {
+        const progress =
+          1 -
+          Math.max(
+            0,
+            mac.rollTimer
+          ) /
+          mac.rollDuration;
+
+        extraRotation +=
+          (
+            -0.22 +
+            progress *
+              0.44
+          ) *
+          mac.facing;
+
+        extraYOffset +=
+          Math.sin(
+            progress *
+            Math.PI
+          ) *
+          3;
+      } else if (
+        macAnim.state ===
+        "grapple"
+      ) {
+        // O corpo acompanha a velocidade angular
+        // em vez de só olhar para a posição.
+        const angularLean =
+          Math.max(
+            -0.16,
+            Math.min(
+              0.16,
+              -grapple.angularVelocity *
+              0.055
+            )
+          );
+
+        extraRotation +=
+          angularLean;
+      } else if (
+        mac.landingTimer > 0
+      ) {
+        const p =
+          1 -
+          mac.landingTimer /
+          0.12;
+
+        extraYOffset +=
+          Math.sin(
+            p *
+            Math.PI
+          ) *
+          2;
+      }
 
       ctx.save();
 
-      if (mac.facing === -1) {
-        const centerX = Math.round(baseX + cfg.width / 2);
-        ctx.translate(centerX, 0);
-        ctx.scale(-1, 1);
-        ctx.translate(-centerX, 0);
+      ctx.translate(
+        pivotX,
+        pivotY +
+        extraYOffset
+      );
+
+      ctx.rotate(
+        extraRotation
+      );
+
+      ctx.translate(
+        -pivotX,
+        -(
+          pivotY +
+          extraYOffset
+        )
+      );
+
+      if (
+        mac.facing === -1
+      ) {
+        const centerX =
+          Math.round(
+            baseX +
+            cfg.width / 2
+          );
+
+        ctx.translate(
+          centerX,
+          0
+        );
+
+        ctx.scale(
+          -1,
+          1
+        );
+
+        ctx.translate(
+          -centerX,
+          0
+        );
       }
 
       if (tint) {
-        macTintCanvas.width = Math.ceil(cfg.width);
-        macTintCanvas.height = Math.ceil(cfg.height);
+        macTintCanvas.width =
+          Math.ceil(
+            cfg.width
+          );
 
-        macTintCtx.clearRect(0, 0, macTintCanvas.width, macTintCanvas.height);
+        macTintCanvas.height =
+          Math.ceil(
+            cfg.height
+          );
+
+        macTintCtx.clearRect(
+          0,
+          0,
+          macTintCanvas.width,
+          macTintCanvas.height
+        );
+
         macTintCtx.drawImage(
           macAtlas,
-          frame.x, frame.y, frame.w, frame.h,
-          frame.ox * scaleX, frame.oy * scaleY,
-          dw, dh
+          frame.x,
+          frame.y,
+          frame.w,
+          frame.h,
+          frame.ox *
+            scaleX,
+          frame.oy *
+            scaleY,
+          dw,
+          dh
         );
-        macTintCtx.globalCompositeOperation = "source-atop";
-        macTintCtx.fillStyle = tint;
-        macTintCtx.fillRect(0, 0, macTintCanvas.width, macTintCanvas.height);
-        macTintCtx.globalCompositeOperation = "source-over";
 
-        ctx.drawImage(macTintCanvas, Math.round(baseX), Math.round(baseY));
+        macTintCtx.globalCompositeOperation =
+          "source-atop";
+
+        macTintCtx.fillStyle =
+          tint;
+
+        macTintCtx.fillRect(
+          0,
+          0,
+          macTintCanvas.width,
+          macTintCanvas.height
+        );
+
+        macTintCtx.globalCompositeOperation =
+          "source-over";
+
+        ctx.drawImage(
+          macTintCanvas,
+          Math.round(
+            baseX
+          ),
+          Math.round(
+            baseY
+          )
+        );
       } else {
-        ctx.drawImage(macAtlas, frame.x, frame.y, frame.w, frame.h, dx, dy, dw, dh);
+        ctx.drawImage(
+          macAtlas,
+          frame.x,
+          frame.y,
+          frame.w,
+          frame.h,
+          dx,
+          dy,
+          dw,
+          dh
+        );
       }
 
       ctx.restore();
@@ -429,8 +803,8 @@
       facing: 1,
 
       rolling: false,
-      rollSpeed: 470,
-      rollDuration: 0.46,
+      rollSpeed: 438,
+      rollDuration: 0.52,
       rollTimer: 0,
       rollCooldown: 0.18,
       rollCooldownTimer: 0,
@@ -460,19 +834,24 @@
       swallowDuration: 0.46,
       swallowType: null,
 
-      landingTimer: 0
+      landingTimer: 0,
+      takeoffTimer: 0,
+
+      castTimer: 0,
+      castDuration: 0,
+      castType: null
     };
 
     const tongue = {
       active: false,
       length: 0,
       maxLength: 170,
-      extendSpeed: 1050,
-      retractSpeed: 1500,
+      extendSpeed: 1120,
+      retractSpeed: 1650,
       retracting: false,
       thickness: 8,
       contactHoldTimer: 0,
-      contactHoldDuration: 0.04,
+      contactHoldDuration: 0.035,
       didHitEnemy: false
     };
 
@@ -481,7 +860,11 @@
       ropeLength: 0,
       minLength: 95,
       maxLength: 175,
-      swingAcceleration: 850
+      swingAcceleration: 7.4,
+      angle: 0,
+      angularVelocity: 0,
+      damping: 0.991,
+      maxAngularSpeed: 4.4
     };
 
     // MOSCA DA ÁGUA
@@ -1507,20 +1890,66 @@
     }
 
     function getMacHitbox() {
-      if (mac.rolling) {
+      const state =
+        getMacAnimState();
+
+      if (state === "roll") {
+        return {
+          x: mac.x + 1,
+          y:
+            mac.y +
+            mac.height -
+            30,
+          width:
+            mac.width - 2,
+          height: 28
+        };
+      }
+
+      if (state === "grapple") {
+        return {
+          x: mac.x + 5,
+          y: mac.y + 7,
+          width:
+            mac.width - 10,
+          height:
+            mac.height - 12
+        };
+      }
+
+      if (state === "jump") {
+        return {
+          x: mac.x + 4,
+          y: mac.y + 5,
+          width:
+            mac.width - 8,
+          height:
+            mac.height - 8
+        };
+      }
+
+      if (
+        state === "tongue" ||
+        normalAttack.active ||
+        mac.castTimer > 0
+      ) {
         return {
           x: mac.x + 3,
           y: mac.y + 3,
-          width: mac.width - 6,
-          height: mac.height - 3
+          width:
+            mac.width - 6,
+          height:
+            mac.height - 5
         };
       }
 
       return {
         x: mac.x + 4,
-        y: mac.y + 4,
-        width: mac.width - 8,
-        height: mac.height - 4
+        y: mac.y + 3,
+        width:
+          mac.width - 8,
+        height:
+          mac.height - 5
       };
     }
 
@@ -1761,6 +2190,9 @@
           mac.vy = -mac.jumpForce;
           mac.grounded = false;
 
+          mac.takeoffTimer = 0.09;
+          mac.landingTimer = 0;
+
           mac.airJumpsRemaining =
             mac.doubleJumpUnlocked ? 1 : 0;
         } else if (
@@ -1768,6 +2200,10 @@
           mac.airJumpsRemaining > 0
         ) {
           mac.vy = -mac.jumpForce;
+
+          mac.takeoffTimer = 0.07;
+          mac.landingTimer = 0;
+
           mac.airJumpsRemaining -= 1;
         }
       }
@@ -1919,20 +2355,66 @@
 
       grapple.active = true;
 
-      const center = getMacCenter();
-      mac.facing = grapplePoint.x >= center.x ? 1 : -1;
+      const center =
+        getMacCenter();
 
-      const currentDistance = distance(
-        center.x,
-        center.y,
-        grapplePoint.x,
-        grapplePoint.y
-      );
+      mac.facing =
+        grapplePoint.x >=
+        center.x
+          ? 1
+          : -1;
 
-      grapple.ropeLength = Math.max(
-        grapple.minLength,
-        Math.min(grapple.maxLength, currentDistance - 12)
-      );
+      const dx =
+        center.x -
+        grapplePoint.x;
+
+      const dy =
+        center.y -
+        grapplePoint.y;
+
+      const currentDistance =
+        Math.hypot(
+          dx,
+          dy
+        );
+
+      grapple.ropeLength =
+        Math.max(
+          grapple.minLength,
+          Math.min(
+            grapple.maxLength,
+            currentDistance - 12
+          )
+        );
+
+      grapple.angle =
+        Math.atan2(
+          dy,
+          dx
+        );
+
+      const tangentX =
+        -Math.sin(
+          grapple.angle
+        );
+
+      const tangentY =
+        Math.cos(
+          grapple.angle
+        );
+
+      const tangentialSpeed =
+        mac.vx *
+          tangentX +
+        mac.vy *
+          tangentY;
+
+      grapple.angularVelocity =
+        tangentialSpeed /
+        Math.max(
+          1,
+          grapple.ropeLength
+        );
 
       mac.grounded = false;
     }
@@ -1987,6 +2469,11 @@
     }
 
     function fireWindBlade() {
+      triggerElementCast(
+        "wind",
+        0.18
+      );
+
       windBlade.cooldownTimer =
         windBlade.cooldown;
 
@@ -2011,6 +2498,11 @@
     }
 
     function startWindGust() {
+      triggerElementCast(
+        "wind",
+        0.28
+      );
+
       windGust.active = true;
       windGust.timer = 0;
       windGust.didHitEnemy = false;
@@ -2020,6 +2512,11 @@
     }
 
     function startWindUltimate() {
+      triggerElementCast(
+        "wind",
+        0.48
+      );
+
       windUltimate.active = true;
       windUltimate.timer = 0;
       windUltimate.didHitEnemy = false;
@@ -2039,6 +2536,11 @@
     }
 
     function fireWaterShot() {
+      triggerElementCast(
+        "water",
+        0.18
+      );
+
       waterShot.cooldownTimer = waterShot.cooldown;
 
       waterShots.push({
@@ -2055,6 +2557,11 @@
     }
 
     function startWaterBurst() {
+      triggerElementCast(
+        "water",
+        0.28
+      );
+
       waterBurst.active = true;
       waterBurst.timer = 0;
       waterBurst.didHitEnemy = false;
@@ -2062,6 +2569,11 @@
     }
 
     function startWaterUltimate() {
+      triggerElementCast(
+        "water",
+        0.48
+      );
+
       waterUltimate.active = true;
       waterUltimate.timer = 0;
       waterUltimate.didHitEnemy = false;
@@ -3012,84 +3524,217 @@
     function updateGrapple(dt) {
       if (!grapple.active) return;
 
-      let swingDirection = 0;
+      let input = 0;
 
-      if (keys["KeyA"] || keys["ArrowLeft"]) {
-        swingDirection -= 1;
+      if (
+        keys["KeyA"] ||
+        keys["ArrowLeft"]
+      ) {
+        input -= 1;
       }
 
-      if (keys["KeyD"] || keys["ArrowRight"]) {
-        swingDirection += 1;
+      if (
+        keys["KeyD"] ||
+        keys["ArrowRight"]
+      ) {
+        input += 1;
       }
 
-      mac.vx += swingDirection * grapple.swingAcceleration * dt;
-      mac.vy += mac.gravity * dt;
+      const length =
+        Math.max(
+          1,
+          grapple.ropeLength
+        );
 
-      mac.x += mac.vx * dt;
-      mac.y += mac.vy * dt;
+      // Pêndulo real:
+      // aceleração angular da gravidade + impulso do jogador.
+      const gravityAngular =
+        (
+          mac.gravity /
+          length
+        ) *
+        Math.cos(
+          grapple.angle
+        );
 
-      const center = getMacCenter();
+      grapple.angularVelocity +=
+        (
+          gravityAngular +
+          input *
+            grapple.swingAcceleration
+        ) *
+        dt;
 
-      let dx = center.x - grapplePoint.x;
-      let dy = center.y - grapplePoint.y;
+      grapple.angularVelocity *=
+        Math.pow(
+          grapple.damping,
+          dt * 60
+        );
 
-      const dist = Math.hypot(dx, dy) || 0.0001;
+      grapple.angularVelocity =
+        Math.max(
+          -grapple.maxAngularSpeed,
+          Math.min(
+            grapple.maxAngularSpeed,
+            grapple.angularVelocity
+          )
+        );
 
-      const nx = dx / dist;
-      const ny = dy / dist;
+      grapple.angle +=
+        grapple.angularVelocity *
+        dt;
 
-      const targetCenterX =
-        grapplePoint.x + nx * grapple.ropeLength;
+      const centerX =
+        grapplePoint.x +
+        Math.cos(
+          grapple.angle
+        ) *
+        length;
 
-      const targetCenterY =
-        grapplePoint.y + ny * grapple.ropeLength;
+      const centerY =
+        grapplePoint.y +
+        Math.sin(
+          grapple.angle
+        ) *
+        length;
 
-      mac.x = targetCenterX - mac.width / 2;
-      mac.y = targetCenterY - mac.height / 2;
+      mac.x =
+        centerX -
+        mac.width / 2;
 
-      const radialVelocity =
-        mac.vx * nx +
-        mac.vy * ny;
+      mac.y =
+        centerY -
+        mac.height / 2;
 
-      mac.vx -= radialVelocity * nx;
-      mac.vy -= radialVelocity * ny;
+      const tangentX =
+        -Math.sin(
+          grapple.angle
+        );
+
+      const tangentY =
+        Math.cos(
+          grapple.angle
+        );
+
+      const tangentialSpeed =
+        grapple.angularVelocity *
+        length;
+
+      mac.vx =
+        tangentX *
+        tangentialSpeed;
+
+      mac.vy =
+        tangentY *
+        tangentialSpeed;
 
       mac.grounded = false;
 
       resolveMacOverlaps();
 
-      if (mac.x <= 0) {
+      // Recalibra o ângulo depois de qualquer correção
+      // de colisão do cenário.
+      const corrected =
+        getMacCenter();
+
+      grapple.angle =
+        Math.atan2(
+          corrected.y -
+            grapplePoint.y,
+          corrected.x -
+            grapplePoint.x
+        );
+
+      if (
+        mac.x <= 0
+      ) {
         mac.x = 0;
       }
 
-      if (mac.x + mac.width >= WORLD_WIDTH) {
-        mac.x = WORLD_WIDTH - mac.width;
+      if (
+        mac.x +
+        mac.width >=
+        WORLD_WIDTH
+      ) {
+        mac.x =
+          WORLD_WIDTH -
+          mac.width;
       }
     }
 
+    function approachValue(
+      current,
+      target,
+      maxDelta
+    ) {
+      if (current < target) {
+        return Math.min(
+          current + maxDelta,
+          target
+        );
+      }
+
+      if (current > target) {
+        return Math.max(
+          current - maxDelta,
+          target
+        );
+      }
+
+      return target;
+    }
+
     function updateNormalMovement(dt) {
-      const wasGrounded = mac.grounded;
+      const wasGrounded =
+        mac.grounded;
 
       if (mac.hurtTimer > 0) {
-        mac.vx *= Math.max(
-          0,
-          1 - 5 * dt
-        );
+        mac.vx *=
+          Math.max(
+            0,
+            1 - 5 * dt
+          );
       } else if (mac.rolling) {
         mac.rollTimer -= dt;
-        mac.vx = mac.facing * mac.rollSpeed;
 
-        if (mac.rollTimer <= 0) {
+        const progress =
+          1 -
+          Math.max(
+            0,
+            mac.rollTimer
+          ) /
+          mac.rollDuration;
+
+        // O roll perde levemente velocidade no final,
+        // evitando aquela sensação de teleporte.
+        const speedScale =
+          1 -
+          progress * 0.15;
+
+        mac.vx =
+          mac.facing *
+          mac.rollSpeed *
+          speedScale;
+
+        if (
+          mac.rollTimer <= 0
+        ) {
           stopRoll();
         }
       } else {
         let direction = 0;
 
-        if (keys["KeyA"] || keys["ArrowLeft"]) {
+        if (
+          keys["KeyA"] ||
+          keys["ArrowLeft"]
+        ) {
           direction -= 1;
         }
 
-        if (keys["KeyD"] || keys["ArrowRight"]) {
+        if (
+          keys["KeyD"] ||
+          keys["ArrowRight"]
+        ) {
           direction += 1;
         }
 
@@ -3097,25 +3742,66 @@
           keys["ShiftLeft"] ||
           keys["ShiftRight"];
 
-        const speed =
+        const maxSpeed =
           running
             ? mac.runSpeed
             : mac.walkSpeed;
 
-        mac.vx = direction * speed;
+        const targetVx =
+          direction *
+          maxSpeed;
 
-        if (direction !== 0 && !tongue.active && !normalAttack.active) {
-          mac.facing = direction;
+        const accelerating =
+          direction !== 0;
+
+        const acceleration =
+          running
+            ? 2450
+            : 2150;
+
+        const deceleration =
+          3150;
+
+        mac.vx =
+          approachValue(
+            mac.vx,
+            targetVx,
+            (
+              accelerating
+                ? acceleration
+                : deceleration
+            ) *
+            dt
+          );
+
+        if (
+          direction !== 0 &&
+          !tongue.active &&
+          !normalAttack.active
+        ) {
+          mac.facing =
+            direction;
         }
       }
 
-      mac.vy += mac.gravity * dt;
+      mac.vy +=
+        mac.gravity *
+        dt;
 
-      moveMacHorizontal(mac.vx * dt);
-      moveMacVertical(mac.vy * dt);
+      moveMacHorizontal(
+        mac.vx * dt
+      );
 
-      if (!wasGrounded && mac.grounded) {
-        mac.landingTimer = 0.08;
+      moveMacVertical(
+        mac.vy * dt
+      );
+
+      if (
+        !wasGrounded &&
+        mac.grounded
+      ) {
+        mac.landingTimer =
+          0.12;
       }
     }
 
@@ -3618,44 +4304,36 @@
       if (!grapple.active) return;
 
       const origin = getVisualTongueOrigin();
-
       const middleX = (origin.x + grapplePoint.x) / 2;
       const middleY = (origin.y + grapplePoint.y) / 2;
-      const sway = Math.max(-6, Math.min(6, mac.vx * 0.018));
+      const sway = Math.max(-5, Math.min(5, mac.vx * 0.015));
+
+      const ropePath = new Path2D();
+      ropePath.moveTo(origin.x, origin.y);
+      ropePath.bezierCurveTo(
+        Math.round(middleX + sway),
+        Math.round(origin.y + (middleY - origin.y) * 0.32),
+        Math.round(middleX + sway),
+        Math.round(middleY),
+        grapplePoint.x,
+        grapplePoint.y
+      );
 
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
 
-      ctx.strokeStyle = "#6b1f3d";
+      ctx.strokeStyle = "#651a38";
       ctx.lineWidth = tongue.thickness + 3;
-
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.quadraticCurveTo(
-        Math.round(middleX + sway),
-        Math.round(middleY),
-        grapplePoint.x,
-        grapplePoint.y
-      );
-      ctx.stroke();
+      ctx.stroke(ropePath);
 
       ctx.strokeStyle = "#ff7ea8";
       ctx.lineWidth = tongue.thickness;
+      ctx.stroke(ropePath);
 
+      ctx.fillStyle = "#ff9abc";
       ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.quadraticCurveTo(
-        Math.round(middleX + sway),
-        Math.round(middleY),
-        grapplePoint.x,
-        grapplePoint.y
-      );
-      ctx.stroke();
-
-      ctx.fillStyle = "#ff97bb";
-      ctx.beginPath();
-      ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
+      ctx.arc(origin.x, origin.y, 3.4, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -3666,67 +4344,71 @@
         return;
       }
 
-      const origin = getVisualTongueOrigin();
-      const endX = origin.x + tongue.length * mac.facing;
-      const holdBump = tongue.contactHoldTimer > 0 ? 1 : 0;
-      const ctrlX = (origin.x + endX) / 2;
-      const ctrlY = origin.y + (tongue.retracting ? 1 : -2) - holdBump;
-      const half = tongue.thickness * 0.5;
-      const tipSize = 4.5;
-      const dir = mac.facing;
+      const origin =
+        getVisualTongueOrigin();
 
-      const tipBaseX = endX - dir * 5;
+      const physicsOrigin =
+        getTongueOrigin();
+
+      // O início é a boca do sprite.
+      // O final é exatamente o ponto usado pela colisão física.
+      const endX =
+        physicsOrigin.x +
+        tongue.length *
+        mac.facing;
+      const holdBump = tongue.contactHoldTimer > 0 ? 1 : 0;
+      const ctrlX1 = origin.x + (endX - origin.x) * 0.28;
+      const ctrlX2 = origin.x + (endX - origin.x) * 0.72;
+      const ctrlY1 = origin.y + (tongue.retracting ? 1 : -3) - holdBump;
+      const ctrlY2 = origin.y + (tongue.retracting ? 1 : -2) - holdBump;
+      const half = tongue.thickness * 0.52;
+      const dir = mac.facing;
+      const tipBaseX = endX - dir * 6;
+
+      const tonguePath = new Path2D();
+      tonguePath.moveTo(origin.x, origin.y - half);
+      tonguePath.bezierCurveTo(
+        ctrlX1,
+        ctrlY1 - half * 0.30,
+        ctrlX2,
+        ctrlY2 - half * 0.20,
+        tipBaseX,
+        origin.y - half * 0.24
+      );
+      tonguePath.lineTo(endX, origin.y);
+      tonguePath.lineTo(tipBaseX, origin.y + half * 0.24);
+      tonguePath.bezierCurveTo(
+        ctrlX2,
+        ctrlY2 + half * 0.20,
+        ctrlX1,
+        ctrlY1 + half * 0.30,
+        origin.x,
+        origin.y + half
+      );
+      tonguePath.closePath();
 
       ctx.save();
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      // Corpo da língua como faixa/tira, mais bonita que uma linha simples.
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y - half);
-      ctx.quadraticCurveTo(
-        Math.round(ctrlX),
-        Math.round(ctrlY - half * 0.45),
-        Math.round(tipBaseX),
-        Math.round(origin.y - half * 0.30)
-      );
-      ctx.lineTo(
-        Math.round(endX),
-        Math.round(origin.y)
-      );
-      ctx.lineTo(
-        Math.round(tipBaseX),
-        Math.round(origin.y + half * 0.30)
-      );
-      ctx.quadraticCurveTo(
-        Math.round(ctrlX),
-        Math.round(ctrlY + half * 0.45),
-        origin.x,
-        origin.y + half
-      );
-      ctx.closePath();
-
       ctx.fillStyle = "#ff7ea8";
-      ctx.fill();
+      ctx.fill(tonguePath);
 
       ctx.strokeStyle = "#6b1f3d";
       ctx.lineWidth = 2;
-      ctx.stroke();
+      ctx.stroke(tonguePath);
 
-      // ponta
       ctx.fillStyle = "#ff9abc";
       ctx.beginPath();
-      ctx.arc(Math.round(endX), Math.round(origin.y), tipSize, 0, Math.PI * 2);
+      ctx.arc(Math.round(endX), Math.round(origin.y), 4.4, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.strokeStyle = "#6b1f3d";
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.4;
       ctx.stroke();
 
-      // tampa a junção na boca e deixa parecer que sai de dentro dela
-      ctx.fillStyle = "#d96f8f";
+      ctx.fillStyle = "#d87090";
       ctx.beginPath();
-      ctx.arc(origin.x, origin.y, 3.2, 0, Math.PI * 2);
+      ctx.arc(origin.x, origin.y, 3.0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -3755,57 +4437,169 @@
     }
 
     function drawNormalAttack() {
-      const hitbox = getNormalAttackHitbox();
+      if (
+        !normalAttack.active
+      ) {
+        return;
+      }
 
-      if (!hitbox) return;
+      const p =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            normalAttack.timer /
+            normalAttack.duration
+          )
+        );
+
+      const centerX =
+        mac.x +
+        mac.width / 2 +
+        mac.facing * 20;
+
+      const centerY =
+        mac.y +
+        mac.height *
+        0.50;
+
+      const startAngle =
+        mac.facing === 1
+          ? -1.05
+          : Math.PI + 1.05;
+
+      const endAngle =
+        startAngle +
+        1.75 *
+        mac.facing;
+
+      const alpha =
+        Math.sin(
+          p *
+          Math.PI
+        );
 
       ctx.save();
 
-      ctx.fillStyle = "rgba(255, 140, 0, 0.30)";
-      ctx.fillRect(
-        Math.round(hitbox.x),
-        Math.round(hitbox.y),
-        Math.round(hitbox.width),
-        Math.round(hitbox.height)
+      ctx.lineCap =
+        "round";
+
+      ctx.globalAlpha =
+        alpha;
+
+      ctx.strokeStyle =
+        "rgba(255,200,100,0.22)";
+
+      ctx.lineWidth = 13;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        centerX,
+        centerY,
+        43,
+        startAngle,
+        endAngle,
+        mac.facing === -1
       );
 
-      if (DEBUG_HITBOX) {
-        ctx.strokeStyle = "#ff8c00";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          Math.round(hitbox.x),
-          Math.round(hitbox.y),
-          Math.round(hitbox.width),
-          Math.round(hitbox.height)
-        );
-      }
+      ctx.stroke();
+
+      ctx.strokeStyle =
+        "#ffd590";
+
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        centerX,
+        centerY,
+        42,
+        startAngle,
+        endAngle,
+        mac.facing === -1
+      );
+
+      ctx.stroke();
 
       ctx.restore();
+
+      if (DEBUG_HITBOX) {
+        const hitbox =
+          getNormalAttackHitbox();
+
+        if (hitbox) {
+          ctx.save();
+
+          ctx.strokeStyle =
+            "#ff8c00";
+
+          ctx.lineWidth = 2;
+
+          ctx.strokeRect(
+            hitbox.x,
+            hitbox.y,
+            hitbox.width,
+            hitbox.height
+          );
+
+          ctx.restore();
+        }
+      }
     }
 
     function drawWindBlades() {
       ctx.save();
+      ctx.lineCap =
+        "round";
 
-      for (const blade of windBlades) {
-        ctx.fillStyle =
-          "rgba(245, 250, 255, 0.92)";
+      for (
+        const blade of
+        windBlades
+      ) {
+        const cx =
+          blade.x +
+          blade.width / 2;
 
-        ctx.fillRect(
-          Math.round(blade.x),
-          Math.round(blade.y),
-          blade.width,
-          blade.height
+        const cy =
+          blade.y +
+          blade.height / 2;
+
+        const dir =
+          Math.sign(
+            blade.vx
+          ) || 1;
+
+        ctx.strokeStyle =
+          "rgba(235,250,255,0.28)";
+
+        ctx.lineWidth = 10;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          cx -
+          dir * 18,
+          cy + 7
         );
 
-        ctx.strokeStyle = "#b0bec5";
-        ctx.lineWidth = 2;
-
-        ctx.strokeRect(
-          Math.round(blade.x),
-          Math.round(blade.y),
-          blade.width,
-          blade.height
+        ctx.quadraticCurveTo(
+          cx,
+          cy - 10,
+          cx +
+          dir * 18,
+          cy - 2
         );
+
+        ctx.stroke();
+
+        ctx.strokeStyle =
+          "#f7feff";
+
+        ctx.lineWidth = 3;
+
+        ctx.stroke();
       }
 
       ctx.restore();
@@ -3817,55 +4611,98 @@
 
       if (!hitbox) return;
 
+      const p =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            windGust.timer /
+            windGust.duration
+          )
+        );
+
       ctx.save();
+      ctx.lineCap =
+        "round";
 
-      ctx.fillStyle =
-        "rgba(238, 245, 248, 0.30)";
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+        const t =
+          i / 4;
 
-      ctx.fillRect(
-        hitbox.x,
-        hitbox.y,
-        hitbox.width,
-        hitbox.height
-      );
-
-      ctx.strokeStyle = "#eceff1";
-      ctx.lineWidth = 3;
-
-      for (let i = 0; i < 4; i++) {
         const y =
           hitbox.y +
-          10 +
-          i * 14;
+          9 +
+          t *
+          (
+            hitbox.height -
+            18
+          );
+
+        const length =
+          hitbox.width *
+          (
+            0.58 +
+            0.30 *
+            Math.sin(
+              p *
+              Math.PI
+            )
+          );
+
+        const startX =
+          mac.facing === 1
+            ? hitbox.x
+            : hitbox.x +
+              hitbox.width;
+
+        const endX =
+          startX +
+          mac.facing *
+          length;
+
+        ctx.strokeStyle =
+          `rgba(225,248,255,${
+            0.20 +
+            0.10 *
+            (1 - t)
+          })`;
+
+        ctx.lineWidth =
+          8 -
+          i * 0.8;
 
         ctx.beginPath();
 
-        if (mac.facing === 1) {
-          ctx.moveTo(
-            hitbox.x,
-            y
-          );
+        ctx.moveTo(
+          startX,
+          y
+        );
 
-          ctx.lineTo(
-            hitbox.x +
-              hitbox.width -
-              i * 10,
-            y - 5
-          );
-        } else {
-          ctx.moveTo(
-            hitbox.x +
-              hitbox.width,
-            y
-          );
+        ctx.bezierCurveTo(
+          startX +
+          mac.facing *
+          length *
+          0.30,
+          y - 7,
+          startX +
+          mac.facing *
+          length *
+          0.72,
+          y + 7,
+          endX,
+          y
+        );
 
-          ctx.lineTo(
-            hitbox.x +
-              i * 10,
-            y - 5
-          );
-        }
+        ctx.stroke();
 
+        ctx.strokeStyle =
+          "#f5fdff";
+
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
 
@@ -3873,62 +4710,124 @@
     }
 
     function drawWindUltimate() {
-      if (!windUltimate.active) {
+      if (
+        !windUltimate.active
+      ) {
         return;
       }
 
-      const x = windUltimate.x;
-      const baseY = ground.y;
-      const h = windUltimate.height;
+      const x =
+        windUltimate.x;
+
+      const baseY =
+        ground.y;
+
+      const h =
+        windUltimate.height;
+
+      const centerX =
+        x +
+        windUltimate.width / 2;
 
       ctx.save();
 
+      const gradient =
+        ctx.createLinearGradient(
+          centerX,
+          baseY - h,
+          centerX,
+          baseY
+        );
+
+      gradient.addColorStop(
+        0,
+        "rgba(255,255,255,0.05)"
+      );
+
+      gradient.addColorStop(
+        0.60,
+        "rgba(220,245,255,0.16)"
+      );
+
+      gradient.addColorStop(
+        1,
+        "rgba(235,250,255,0.06)"
+      );
+
       ctx.fillStyle =
-        "rgba(245, 250, 255, 0.18)";
+        gradient;
 
       ctx.beginPath();
+
       ctx.moveTo(
-        x + windUltimate.width / 2,
+        centerX,
         baseY - h
       );
+
       ctx.lineTo(
-        x + windUltimate.width,
+        x +
+        windUltimate.width,
         baseY
       );
+
       ctx.lineTo(
         x,
         baseY
       );
+
       ctx.closePath();
       ctx.fill();
 
-      ctx.strokeStyle = "#f5f5f5";
-      ctx.lineWidth = 4;
+      ctx.strokeStyle =
+        "rgba(245,253,255,0.90)";
 
-      for (let i = 0; i < 5; i++) {
+      ctx.lineWidth = 3;
+
+      const spin =
+        windUltimate.timer *
+        8;
+
+      for (
+        let i = 0;
+        i < 6;
+        i++
+      ) {
+        const t =
+          i / 5;
+
         const layerY =
           baseY -
-          22 -
-          i * 32;
+          18 -
+          t *
+          (
+            h -
+            35
+          );
 
-        const layerWidth =
-          windUltimate.width -
-          i * 10;
+        const radius =
+          38 -
+          t * 23;
 
         ctx.beginPath();
+
         ctx.ellipse(
-          x +
-            windUltimate.width / 2,
+          centerX +
+          Math.sin(
+            spin +
+            i * 0.9
+          ) *
+          4,
           layerY,
           Math.max(
-            12,
-            layerWidth / 2
+            9,
+            radius
           ),
-          9,
+          8,
           0,
           0,
           Math.PI * 2
         );
+
         ctx.stroke();
       }
 
@@ -3938,20 +4837,158 @@
     function drawWaterShots() {
       ctx.save();
 
-      for (const shot of waterShots) {
-        ctx.fillStyle = "#29b6f6";
+      for (
+        const shot of
+        waterShots
+      ) {
+        const dir =
+          Math.sign(
+            shot.vx
+          ) || 1;
+
+        ctx.strokeStyle =
+          "rgba(65,190,255,0.28)";
+
+        ctx.lineWidth = 8;
+        ctx.lineCap =
+          "round";
 
         ctx.beginPath();
+
+        ctx.moveTo(
+          shot.x -
+          dir * 18,
+          shot.y
+        );
+
+        ctx.lineTo(
+          shot.x,
+          shot.y
+        );
+
+        ctx.stroke();
+
+        const gradient =
+          ctx.createRadialGradient(
+            shot.x - 2,
+            shot.y - 2,
+            1,
+            shot.x,
+            shot.y,
+            shot.radius + 5
+          );
+
+        gradient.addColorStop(
+          0,
+          "#e8fbff"
+        );
+
+        gradient.addColorStop(
+          0.42,
+          "#42c9ff"
+        );
+
+        gradient.addColorStop(
+          1,
+          "rgba(0,125,235,0)"
+        );
+
+        ctx.fillStyle =
+          gradient;
+
+        ctx.beginPath();
+
         ctx.arc(
-          Math.round(shot.x),
-          Math.round(shot.y),
-          shot.radius,
+          shot.x,
+          shot.y,
+          shot.radius + 5,
           0,
           Math.PI * 2
         );
+
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    function drawWaterBurst() {
+      const hitbox =
+        getWaterBurstHitbox();
+
+      if (!hitbox) return;
+
+      const p =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            waterBurst.timer /
+            waterBurst.duration
+          )
+        );
+
+      ctx.save();
+
+      for (
+        let i = 0;
+        i < 4;
+        i++
+      ) {
+        const t =
+          i / 3;
+
+        const x =
+          mac.facing === 1
+            ? hitbox.x +
+              hitbox.width *
+              t
+            : hitbox.x +
+              hitbox.width *
+              (1 - t);
+
+        const y =
+          hitbox.y +
+          hitbox.height *
+          (
+            0.35 +
+            0.23 *
+            Math.sin(
+              i * 1.7 +
+              p *
+              3
+            )
+          );
+
+        const radius =
+          13 +
+          p *
+          (
+            15 +
+            i * 5
+          );
+
+        ctx.fillStyle =
+          `rgba(45,185,255,${
+            0.22 -
+            i * 0.026
+          })`;
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          radius,
+          0,
+          Math.PI * 2
+        );
+
         ctx.fill();
 
-        ctx.strokeStyle = "#b3e5fc";
+        ctx.strokeStyle =
+          "rgba(180,235,255,0.76)";
+
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -3959,58 +4996,111 @@
       ctx.restore();
     }
 
-    function drawWaterBurst() {
-      const hitbox = getWaterBurstHitbox();
-
-      if (!hitbox) return;
-
-      ctx.save();
-
-      ctx.fillStyle = "rgba(41, 182, 246, 0.45)";
-
-      ctx.fillRect(
-        hitbox.x,
-        hitbox.y,
-        hitbox.width,
-        hitbox.height
-      );
-
-      ctx.strokeStyle = "#81d4fa";
-      ctx.lineWidth = 3;
-
-      ctx.strokeRect(
-        hitbox.x,
-        hitbox.y,
-        hitbox.width,
-        hitbox.height
-      );
-
-      ctx.restore();
-    }
-
     function drawWaterUltimate() {
-      if (!waterUltimate.active) return;
+      if (
+        !waterUltimate.active
+      ) {
+        return;
+      }
+
+      const x =
+        waterUltimate.waveX;
+
+      const width =
+        waterUltimate.waveWidth;
+
+      const baseY =
+        ground.y;
+
+      const height = 195;
 
       ctx.save();
 
-      ctx.fillStyle = "rgba(0, 145, 234, 0.58)";
+      const gradient =
+        ctx.createLinearGradient(
+          x,
+          baseY - height,
+          x + width,
+          baseY
+        );
 
-      ctx.fillRect(
-        waterUltimate.waveX,
-        ground.y - 195,
-        waterUltimate.waveWidth,
-        195
+      gradient.addColorStop(
+        0,
+        "rgba(30,175,255,0.10)"
       );
 
-      ctx.strokeStyle = "#b3e5fc";
-      ctx.lineWidth = 5;
-
-      ctx.strokeRect(
-        waterUltimate.waveX,
-        ground.y - 195,
-        waterUltimate.waveWidth,
-        195
+      gradient.addColorStop(
+        0.45,
+        "rgba(30,175,255,0.50)"
       );
+
+      gradient.addColorStop(
+        1,
+        "rgba(0,110,235,0.20)"
+      );
+
+      ctx.fillStyle =
+        gradient;
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x,
+        baseY
+      );
+
+      ctx.bezierCurveTo(
+        x +
+        width * 0.20,
+        baseY -
+        height * 0.55,
+        x +
+        width * 0.52,
+        baseY -
+        height,
+        x +
+        width,
+        baseY -
+        height * 0.54
+      );
+
+      ctx.lineTo(
+        x +
+        width,
+        baseY
+      );
+
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle =
+        "rgba(195,240,255,0.92)";
+
+      ctx.lineWidth = 4;
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x,
+        baseY - 5
+      );
+
+      ctx.bezierCurveTo(
+        x +
+        width * 0.23,
+        baseY -
+        height * 0.52,
+        x +
+        width * 0.55,
+        baseY -
+        height,
+        x +
+        width,
+        baseY -
+        height * 0.55
+      );
+
+      ctx.stroke();
 
       ctx.restore();
     }
