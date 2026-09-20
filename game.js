@@ -28,7 +28,8 @@ const mac = {
   vx: 0,
   vy: 0,
 
-  moveSpeed: 260,
+  walkSpeed: 220,
+  runSpeed: 390,
   jumpForce: 620,
   gravity: 1700,
 
@@ -37,7 +38,7 @@ const mac = {
 
   rolling: false,
   rollSpeed: 520,
-  rollDuration: 0.32,
+  rollDuration: 0.30,
   rollTimer: 0,
   rollCooldown: 0.15,
   rollCooldownTimer: 0,
@@ -56,6 +57,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 
+  // PULO
   if (
     (event.code === "Space" ||
       event.code === "KeyW" ||
@@ -67,8 +69,9 @@ window.addEventListener("keydown", (event) => {
     mac.grounded = false;
   }
 
+  // ROLAGEM
   if (
-    (event.code === "ShiftLeft" || event.code === "ShiftRight") &&
+    event.code === "KeyX" &&
     mac.grounded &&
     !mac.rolling &&
     mac.rollCooldownTimer <= 0
@@ -85,19 +88,19 @@ function startRoll() {
   mac.rolling = true;
   mac.rollTimer = mac.rollDuration;
 
-  const oldBottom = mac.y + mac.height;
-  mac.height = mac.rollHeight;
-  mac.y = oldBottom - mac.height;
+  const bottom = mac.y + mac.height;
 
+  mac.height = mac.rollHeight;
+  mac.y = bottom - mac.height;
   mac.vx = mac.facing * mac.rollSpeed;
 }
 
 function endRoll() {
-  const oldBottom = mac.y + mac.height;
+  const bottom = mac.y + mac.height;
 
   mac.rolling = false;
   mac.height = mac.normalHeight;
-  mac.y = oldBottom - mac.height;
+  mac.y = bottom - mac.height;
 
   mac.rollCooldownTimer = mac.rollCooldown;
 }
@@ -125,18 +128,29 @@ function update(dt) {
       direction += 1;
     }
 
-    mac.vx = direction * mac.moveSpeed;
+    const running =
+      keys["ShiftLeft"] ||
+      keys["ShiftRight"];
+
+    const speed = running
+      ? mac.runSpeed
+      : mac.walkSpeed;
+
+    mac.vx = direction * speed;
 
     if (direction !== 0) {
       mac.facing = direction;
     }
   }
 
+  // GRAVIDADE
   mac.vy += mac.gravity * dt;
 
+  // MOVIMENTO
   mac.x += mac.vx * dt;
   mac.y += mac.vy * dt;
 
+  // LIMITES LATERAIS
   if (mac.x < 0) {
     mac.x = 0;
   }
@@ -145,9 +159,8 @@ function update(dt) {
     mac.x = GAME_WIDTH - mac.width;
   }
 
-  const macBottom = mac.y + mac.height;
-
-  if (macBottom >= ground.y && mac.vy >= 0) {
+  // COLISÃO COM O CHÃO
+  if (mac.y + mac.height >= ground.y && mac.vy >= 0) {
     mac.y = ground.y - mac.height;
     mac.vy = 0;
     mac.grounded = true;
@@ -163,11 +176,17 @@ function drawBackground() {
 
 function drawGround() {
   ctx.fillStyle = ground.color;
-  ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+  ctx.fillRect(
+    ground.x,
+    ground.y,
+    ground.width,
+    ground.height
+  );
 }
 
 function drawMac() {
   ctx.fillStyle = mac.color;
+
   ctx.fillRect(
     Math.round(mac.x),
     Math.round(mac.y),
@@ -177,7 +196,12 @@ function drawMac() {
 }
 
 function render() {
-  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  ctx.clearRect(
+    0,
+    0,
+    GAME_WIDTH,
+    GAME_HEIGHT
+  );
 
   drawBackground();
   drawGround();
@@ -187,7 +211,11 @@ function render() {
 let lastTime = performance.now();
 
 function gameLoop(currentTime) {
-  const dt = Math.min((currentTime - lastTime) / 1000, 0.033);
+  const dt = Math.min(
+    (currentTime - lastTime) / 1000,
+    0.033
+  );
+
   lastTime = currentTime;
 
   update(dt);
