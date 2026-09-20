@@ -3,27 +3,26 @@ const ctx = canvas.getContext("2d");
 
 ctx.imageSmoothingEnabled = false;
 
-const GAME_WIDTH = canvas.width;
-const GAME_HEIGHT = canvas.height;
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+
+const keys = {};
 
 const ground = {
   x: 0,
   y: 440,
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT - 440,
-  color: "#666666"
+  width: WIDTH,
+  height: HEIGHT - 440
 };
-
-const keys = {};
 
 const mac = {
   x: 120,
   y: 0,
 
   width: 32,
+  height: 64,
   normalHeight: 64,
   rollHeight: 32,
-  height: 64,
 
   vx: 0,
   vy: 0,
@@ -39,29 +38,30 @@ const mac = {
   rolling: false,
   rollSpeed: 520,
   rollDuration: 0.30,
-  rollTimer: 0,
-  rollCooldown: 0.15,
-  rollCooldownTimer: 0,
-
-  color: "#22c55e"
+  rollTimer: 0
 };
 
 mac.y = ground.y - mac.height;
 
-window.addEventListener("keydown", (event) => {
+window.addEventListener("keydown", event => {
   keys[event.code] = true;
 
   if (
-    ["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)
+    event.code === "ArrowLeft" ||
+    event.code === "ArrowRight" ||
+    event.code === "ArrowUp" ||
+    event.code === "Space"
   ) {
     event.preventDefault();
   }
 
-  // PULO
+  const jumpPressed =
+    event.code === "Space" ||
+    event.code === "KeyW" ||
+    event.code === "ArrowUp";
+
   if (
-    (event.code === "Space" ||
-      event.code === "KeyW" ||
-      event.code === "ArrowUp") &&
+    jumpPressed &&
     mac.grounded &&
     !mac.rolling
   ) {
@@ -69,18 +69,16 @@ window.addEventListener("keydown", (event) => {
     mac.grounded = false;
   }
 
-  // ROLAGEM
   if (
     event.code === "KeyX" &&
     mac.grounded &&
-    !mac.rolling &&
-    mac.rollCooldownTimer <= 0
+    !mac.rolling
   ) {
     startRoll();
   }
 });
 
-window.addEventListener("keyup", (event) => {
+window.addEventListener("keyup", event => {
   keys[event.code] = false;
 });
 
@@ -92,30 +90,27 @@ function startRoll() {
 
   mac.height = mac.rollHeight;
   mac.y = bottom - mac.height;
+
   mac.vx = mac.facing * mac.rollSpeed;
 }
 
-function endRoll() {
+function stopRoll() {
   const bottom = mac.y + mac.height;
 
   mac.rolling = false;
+
   mac.height = mac.normalHeight;
   mac.y = bottom - mac.height;
-
-  mac.rollCooldownTimer = mac.rollCooldown;
 }
 
 function update(dt) {
-  if (mac.rollCooldownTimer > 0) {
-    mac.rollCooldownTimer -= dt;
-  }
-
   if (mac.rolling) {
     mac.rollTimer -= dt;
+
     mac.vx = mac.facing * mac.rollSpeed;
 
     if (mac.rollTimer <= 0) {
-      endRoll();
+      stopRoll();
     }
   } else {
     let direction = 0;
@@ -132,9 +127,8 @@ function update(dt) {
       keys["ShiftLeft"] ||
       keys["ShiftRight"];
 
-    const speed = running
-      ? mac.runSpeed
-      : mac.walkSpeed;
+    const speed =
+      running ? mac.runSpeed : mac.walkSpeed;
 
     mac.vx = direction * speed;
 
@@ -143,24 +137,23 @@ function update(dt) {
     }
   }
 
-  // GRAVIDADE
   mac.vy += mac.gravity * dt;
 
-  // MOVIMENTO
   mac.x += mac.vx * dt;
   mac.y += mac.vy * dt;
 
-  // LIMITES LATERAIS
   if (mac.x < 0) {
     mac.x = 0;
   }
 
-  if (mac.x + mac.width > GAME_WIDTH) {
-    mac.x = GAME_WIDTH - mac.width;
+  if (mac.x + mac.width > WIDTH) {
+    mac.x = WIDTH - mac.width;
   }
 
-  // COLISÃO COM O CHÃO
-  if (mac.y + mac.height >= ground.y && mac.vy >= 0) {
+  if (
+    mac.y + mac.height >= ground.y &&
+    mac.vy >= 0
+  ) {
     mac.y = ground.y - mac.height;
     mac.vy = 0;
     mac.grounded = true;
@@ -169,24 +162,24 @@ function update(dt) {
   }
 }
 
-function drawBackground() {
-  ctx.fillStyle = "#1b1b1b";
-  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-}
+function draw() {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-function drawGround() {
-  ctx.fillStyle = ground.color;
+  // Fundo
+  ctx.fillStyle = "#1b1b1b";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Chão
+  ctx.fillStyle = "#666666";
   ctx.fillRect(
     ground.x,
     ground.y,
     ground.width,
     ground.height
   );
-}
 
-function drawMac() {
-  ctx.fillStyle = mac.color;
-
+  // Mac
+  ctx.fillStyle = "#22c55e";
   ctx.fillRect(
     Math.round(mac.x),
     Math.round(mac.y),
@@ -195,33 +188,20 @@ function drawMac() {
   );
 }
 
-function render() {
-  ctx.clearRect(
-    0,
-    0,
-    GAME_WIDTH,
-    GAME_HEIGHT
-  );
-
-  drawBackground();
-  drawGround();
-  drawMac();
-}
-
 let lastTime = performance.now();
 
-function gameLoop(currentTime) {
+function loop(time) {
   const dt = Math.min(
-    (currentTime - lastTime) / 1000,
+    (time - lastTime) / 1000,
     0.033
   );
 
-  lastTime = currentTime;
+  lastTime = time;
 
   update(dt);
-  render();
+  draw();
 
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(gameLoop);
+requestAnimationFrame(loop);
