@@ -1,16 +1,33 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metroidvania Prototype</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="game-wrapper">
-    <canvas id="game" width="960" height="540"></canvas>
-  </main>
 
-  <script src="game.js"></script>
+<body>
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <script>
+    fetch("game.txt")
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Não foi possível carregar game.txt");
+        }
+
+        return response.text();
+      })
+      .then(code => {
+        new Function(code)();
+      })
+      .catch(error => {
+        console.error(error);
+
+        document.body.innerHTML =
+          "<p style='color:white;font-family:sans-serif'>Erro ao carregar game.txt</p>";
+      });
+  </script>
 </body>
 </html>
