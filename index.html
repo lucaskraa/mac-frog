@@ -28,15 +28,57 @@
       image-rendering: crisp-edges;
       outline: none;
     }
+
+    #restartGameButton {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 10;
+
+      padding: 9px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      border-radius: 6px;
+
+      color: #ffffff;
+      background: rgba(12, 12, 12, 0.72);
+
+      font: 600 12px/1 sans-serif;
+      letter-spacing: 0.04em;
+
+      cursor: pointer;
+      user-select: none;
+      backdrop-filter: blur(3px);
+    }
+
+    #restartGameButton:hover {
+      background: rgba(45, 45, 45, 0.84);
+    }
+
+    #restartGameButton:active {
+      transform: translateY(1px);
+    }
   </style>
 </head>
 
 <body>
   <canvas id="game" width="960" height="540"></canvas>
 
+  <button
+    id="restartGameButton"
+    type="button"
+    title="Apaga o save atual e reinicia desde o começo"
+  >
+    REINICIAR [R]
+  </button>
+
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+
+    const restartGameButton =
+      document.getElementById(
+        "restartGameButton"
+      );
 
     ctx.imageSmoothingEnabled = false;
 
@@ -99,7 +141,7 @@
     const MAC_CENTER_STABILIZE = {
       idle: 0.42,
       walk: 0.52,
-      run: 0.58,
+      run: 0.52,
       jump: 0.28,
       roll: 0.18,
       tongue: 0.42,
@@ -206,7 +248,7 @@
     }
 
     function updateSmoothedSpeed(rawSpeed) {
-      const response = 0.18;
+      const response = 0.16;
 
       macAnim.smoothedSpeed +=
         (
@@ -348,6 +390,40 @@
       return macAnim.frame;
     }
 
+    function getRunFrameFromPhase(
+      phase
+    ) {
+      // Os quadros de contato ficam um pouco mais tempo
+      // visíveis e os quadros intermediários passam mais rápido.
+      // Mantém os 8 sprites originais, sem pular nenhum.
+      const cuts = [
+        0.00,
+        0.145,
+        0.255,
+        0.355,
+        0.500,
+        0.645,
+        0.755,
+        0.855,
+        1.001
+      ];
+
+      for (
+        let i = 0;
+        i < 8;
+        i++
+      ) {
+        if (
+          phase >= cuts[i] &&
+          phase < cuts[i + 1]
+        ) {
+          return i;
+        }
+      }
+
+      return 7;
+    }
+
     function setLocomotionFrame(
       dt,
       state,
@@ -360,16 +436,15 @@
 
       const stride =
         state === "run"
-          ? 188
+          ? 216
           : 146;
 
-      // A fase acompanha a distância que o personagem realmente
-      // percorre. Isso reduz "pé deslizando" e impede a animação
-      // de correr quando o Mac está praticamente parado.
+      // A animação continua presa à velocidade real do Mac,
+      // mas a corrida ficou um pouco menos acelerada.
       const cyclesPerSecond =
         Math.max(
           state === "run"
-            ? 0.92
+            ? 0.78
             : 0.58,
           speed /
             Math.max(
@@ -384,6 +459,15 @@
           cyclesPerSecond *
             dt
         ) % 1;
+
+      if (state === "run") {
+        macAnim.frame =
+          getRunFrameFromPhase(
+            macAnim.locomotionPhase
+          );
+
+        return;
+      }
 
       const frameFloat =
         macAnim.locomotionPhase *
@@ -895,13 +979,42 @@
 
       // A parte visível de cada frame é ancorada pelo pé.
       // Assim o sprite nunca "flutua" acima da hitbox/chão.
-      const dy =
-        Math.round(
+      let spriteTopY =
+        mac.y +
+        mac.height -
+        frame.h *
+          uniformScale +
+        actionY;
+
+      if (
+        state === "run" &&
+        MAC_FRAME_BASELINES.run
+      ) {
+        const baseline =
+          MAC_FRAME_BASELINES.run;
+
+        const sourceBaselineTop =
           mac.y +
           mac.height -
-          frame.h *
-            uniformScale +
-          actionY
+          (
+            baseline.bottom -
+            frame.oy
+          ) *
+          uniformScale +
+          actionY;
+
+        spriteTopY =
+          spriteTopY +
+          (
+            sourceBaselineTop -
+            spriteTopY
+          ) *
+          baseline.strength;
+      }
+
+      const dy =
+        Math.round(
+          spriteTopY
         );
 
       const dw =
@@ -1583,6 +1696,27 @@
         height: checkpoint.height
       };
     }
+
+    function restartGameFromBeginning() {
+      try {
+        localStorage.removeItem(
+          SAVE_KEY
+        );
+      } catch (error) {
+        console.warn(
+          "Não foi possível apagar o save:",
+          error
+        );
+      }
+
+      // Recarrega a página depois de remover o progresso salvo.
+      window.location.reload();
+    }
+
+    restartGameButton.addEventListener(
+      "click",
+      restartGameFromBeginning
+    );
 
     function saveGame() {
       const saveData = {
@@ -5861,6 +5995,15 @@
         "X do mundo: " + Math.round(mac.x),
         WIDTH - 150,
         42
+      );
+
+      ctx.font = "12px sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.66)";
+
+      ctx.fillText(
+        "R: reiniciar do começo",
+        18,
+        HEIGHT - 28
       );
 
       ctx.font = "18px sans-serif";
