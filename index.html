@@ -38,7 +38,8 @@
     const macAnim = {
       state: "idle",
       frame: 0,
-      timer: 0
+      timer: 0,
+      seqPos: 0
     };
 
     const MAC_DRAW = {
@@ -46,11 +47,30 @@
       walk: { width: 90, height: 148, leadX: 1, yOffset: 0 },
       run: { width: 92, height: 146, leadX: 3, yOffset: 0 },
       jump: { width: 90, height: 148, leadX: 1, yOffset: 0 },
-      roll: { width: 84, height: 90, leadX: 1, yOffset: -2 },
+      roll: { width: 78, height: 84, leadX: 0, yOffset: -4 },
       tongue: { width: 94, height: 150, leadX: 2, yOffset: 0 },
       grapple: { width: 108, height: 162, leadX: 0, yOffset: -1 },
       swallowWater: { width: 90, height: 148, leadX: 0, yOffset: 0 },
       swallowWind: { width: 90, height: 148, leadX: 0, yOffset: 0 }
+    };
+
+    const MAC_MOUTH_ANCHORS = {
+      tongue: [
+        { x: 0.665, y: 0.315 },
+        { x: 0.680, y: 0.310 },
+        { x: 0.695, y: 0.304 },
+        { x: 0.705, y: 0.299 },
+        { x: 0.712, y: 0.296 },
+        { x: 0.702, y: 0.300 }
+      ],
+
+      grapple: [
+        { x: 0.590, y: 0.300 },
+        { x: 0.604, y: 0.288 },
+        { x: 0.616, y: 0.280 },
+        { x: 0.604, y: 0.288 },
+        { x: 0.592, y: 0.300 }
+      ]
     };
 
     const FLY_DRAW = {
@@ -73,6 +93,7 @@
       macAnim.state = state;
       macAnim.frame = 0;
       macAnim.timer = 0;
+      macAnim.seqPos = 0;
     }
 
     function getMacAnimState() {
@@ -90,17 +111,20 @@
       return "idle";
     }
 
-    function advanceLoopFrames(dt, fps, sequence) {
-      const frameTime = 1 / fps;
-      macAnim.timer += dt;
-      while (macAnim.timer >= frameTime) {
-        macAnim.timer -= frameTime;
-        macAnim.frame += 1;
-        if (macAnim.frame >= sequence.length) {
-          macAnim.frame = 0;
-        }
+    function advanceSequence(dt, sequence, durations, speedScale = 1) {
+      const durationList = Array.isArray(durations)
+        ? durations
+        : sequence.map(() => durations);
+
+      macAnim.timer += dt * speedScale;
+
+      while (macAnim.timer >= durationList[macAnim.seqPos]) {
+        macAnim.timer -= durationList[macAnim.seqPos];
+        macAnim.seqPos = (macAnim.seqPos + 1) % sequence.length;
       }
-      return sequence[macAnim.frame];
+
+      macAnim.frame = sequence[macAnim.seqPos];
+      return macAnim.frame;
     }
 
     function updateMacAnimation(dt) {
@@ -111,30 +135,32 @@
       const speed = Math.abs(mac.vx);
 
       if (state === "idle") {
-        macAnim.frame = advanceLoopFrames(
+        advanceSequence(
           dt,
-          6.3,
-          [0,1,2,3,4,5,6,7,6,5,4,3,2,1]
+          [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1],
+          [0.12, 0.11, 0.10, 0.09, 0.10, 0.11, 0.12, 0.14, 0.12, 0.11, 0.10, 0.09, 0.10, 0.11]
         );
         return;
       }
 
       if (state === "walk") {
-        const fps = 8 + Math.min(2, speed / 220 * 2);
-        macAnim.frame = advanceLoopFrames(
+        const walkScale = 0.92 + Math.min(0.40, speed / Math.max(1, mac.walkSpeed) * 0.40);
+        advanceSequence(
           dt,
-          fps,
-          [0,1,2,3,4,5,6,7]
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0.11, 0.08, 0.07, 0.08, 0.11, 0.08, 0.07, 0.08],
+          walkScale
         );
         return;
       }
 
       if (state === "run") {
-        const fps = 11 + Math.min(3, speed / 390 * 3);
-        macAnim.frame = advanceLoopFrames(
+        const runScale = 1.02 + Math.min(0.48, speed / Math.max(1, mac.runSpeed) * 0.48);
+        advanceSequence(
           dt,
-          fps,
-          [0,1,2,3,4,5,6,7]
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0.09, 0.06, 0.055, 0.06, 0.09, 0.06, 0.055, 0.06],
+          runScale
         );
         return;
       }
@@ -159,18 +185,23 @@
       }
 
       if (state === "roll") {
-        const seq = [0,1,2,3,4,5,4,3];
+        const sequence = [0, 1, 1, 2, 3, 4, 4, 5, 4, 3];
         const progress = 1 - Math.max(0, mac.rollTimer) / mac.rollDuration;
-        macAnim.frame = seq[Math.min(seq.length - 1, Math.floor(progress * seq.length))];
+        macAnim.frame = sequence[
+          Math.min(sequence.length - 1, Math.floor(progress * sequence.length))
+        ];
         return;
       }
 
       if (state === "tongue") {
         const progress = Math.max(0, Math.min(1, tongue.length / Math.max(1, tongue.maxLength)));
-        const seq = tongue.retracting
-          ? [5,4,3,2,1,0]
-          : [0,1,2,3,4,5];
-        macAnim.frame = seq[Math.min(seq.length - 1, Math.floor(progress * (seq.length - 1)))];
+        const sequence = tongue.retracting
+          ? [5, 4, 3, 2, 1, 0]
+          : [0, 1, 2, 3, 4, 5];
+
+        macAnim.frame = sequence[
+          Math.min(sequence.length - 1, Math.floor(progress * (sequence.length - 1)))
+        ];
         return;
       }
 
@@ -178,11 +209,13 @@
         const center = getMacCenter();
         const dx = center.x - grapplePoint.x;
         const ratio = Math.max(-1, Math.min(1, dx / Math.max(1, grapple.ropeLength)));
+
         if (ratio < -0.55) macAnim.frame = 0;
         else if (ratio < -0.18) macAnim.frame = 1;
         else if (ratio < 0.18) macAnim.frame = 2;
         else if (ratio < 0.55) macAnim.frame = 3;
         else macAnim.frame = 4;
+
         return;
       }
 
@@ -396,8 +429,8 @@
       facing: 1,
 
       rolling: false,
-      rollSpeed: 500,
-      rollDuration: 0.40,
+      rollSpeed: 470,
+      rollDuration: 0.46,
       rollTimer: 0,
       rollCooldown: 0.18,
       rollCooldownTimer: 0,
@@ -434,12 +467,12 @@
       active: false,
       length: 0,
       maxLength: 170,
-      extendSpeed: 950,
-      retractSpeed: 1200,
+      extendSpeed: 1050,
+      retractSpeed: 1500,
       retracting: false,
       thickness: 8,
       contactHoldTimer: 0,
-      contactHoldDuration: 0.06,
+      contactHoldDuration: 0.04,
       didHitEnemy: false
     };
 
@@ -1494,7 +1527,7 @@
     function getTongueOrigin() {
       return {
         x: mac.facing === 1 ? mac.x + mac.width - 1 : mac.x + 1,
-        y: mac.y + mac.height * 0.45
+        y: mac.y + mac.height * 0.44
       };
     }
 
@@ -3566,16 +3599,14 @@
       const baseY =
         mac.y + mac.height - cfg.height + cfg.yOffset;
 
-      let localX;
-      let localY;
+      const anchors = MAC_MOUTH_ANCHORS[state];
+      const currentFrame = Math.max(0, Math.min(anchors.length - 1, macAnim.frame));
+      const anchor = anchors[currentFrame];
 
-      if (grapple.active) {
-        localX = mac.facing === 1 ? cfg.width * 0.62 : cfg.width * 0.38;
-        localY = cfg.height * 0.29;
-      } else {
-        localX = mac.facing === 1 ? cfg.width * 0.69 : cfg.width * 0.31;
-        localY = cfg.height * 0.31;
-      }
+      const rightX = cfg.width * anchor.x;
+      const leftX = cfg.width * (1 - anchor.x);
+      const localX = mac.facing === 1 ? rightX : leftX;
+      const localY = cfg.height * anchor.y;
 
       return {
         x: Math.round(baseX + localX),
@@ -3590,12 +3621,13 @@
 
       const middleX = (origin.x + grapplePoint.x) / 2;
       const middleY = (origin.y + grapplePoint.y) / 2;
-      const sway = Math.max(-7, Math.min(7, mac.vx * 0.02));
+      const sway = Math.max(-6, Math.min(6, mac.vx * 0.018));
 
       ctx.save();
       ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
-      ctx.strokeStyle = "#7f2546";
+      ctx.strokeStyle = "#6b1f3d";
       ctx.lineWidth = tongue.thickness + 3;
 
       ctx.beginPath();
@@ -3620,6 +3652,11 @@
         grapplePoint.y
       );
       ctx.stroke();
+
+      ctx.fillStyle = "#ff97bb";
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
     }
@@ -3631,41 +3668,65 @@
 
       const origin = getVisualTongueOrigin();
       const endX = origin.x + tongue.length * mac.facing;
-      const contactBump = tongue.contactHoldTimer > 0 ? 1 : 0;
-      const curveY = origin.y + (tongue.retracting ? 1 : -2) - contactBump;
+      const holdBump = tongue.contactHoldTimer > 0 ? 1 : 0;
+      const ctrlX = (origin.x + endX) / 2;
+      const ctrlY = origin.y + (tongue.retracting ? 1 : -2) - holdBump;
+      const half = tongue.thickness * 0.5;
+      const tipSize = 4.5;
+      const dir = mac.facing;
+
+      const tipBaseX = endX - dir * 5;
 
       ctx.save();
+      ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      // contorno
-      ctx.strokeStyle = "#7f2546";
-      ctx.lineWidth = tongue.thickness + 3;
+      // Corpo da língua como faixa/tira, mais bonita que uma linha simples.
       ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
+      ctx.moveTo(origin.x, origin.y - half);
       ctx.quadraticCurveTo(
-        Math.round((origin.x + endX) / 2),
-        Math.round(curveY),
+        Math.round(ctrlX),
+        Math.round(ctrlY - half * 0.45),
+        Math.round(tipBaseX),
+        Math.round(origin.y - half * 0.30)
+      );
+      ctx.lineTo(
         Math.round(endX),
         Math.round(origin.y)
       );
-      ctx.stroke();
-
-      // preenchimento
-      ctx.strokeStyle = "#ff7ea8";
-      ctx.lineWidth = tongue.thickness;
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.quadraticCurveTo(
-        Math.round((origin.x + endX) / 2),
-        Math.round(curveY),
-        Math.round(endX),
-        Math.round(origin.y)
+      ctx.lineTo(
+        Math.round(tipBaseX),
+        Math.round(origin.y + half * 0.30)
       );
+      ctx.quadraticCurveTo(
+        Math.round(ctrlX),
+        Math.round(ctrlY + half * 0.45),
+        origin.x,
+        origin.y + half
+      );
+      ctx.closePath();
+
+      ctx.fillStyle = "#ff7ea8";
+      ctx.fill();
+
+      ctx.strokeStyle = "#6b1f3d";
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = "#ff97bb";
+      // ponta
+      ctx.fillStyle = "#ff9abc";
       ctx.beginPath();
-      ctx.arc(Math.round(endX), Math.round(origin.y), 4.5, 0, Math.PI * 2);
+      ctx.arc(Math.round(endX), Math.round(origin.y), tipSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#6b1f3d";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // tampa a junção na boca e deixa parecer que sai de dentro dela
+      ctx.fillStyle = "#d96f8f";
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, 3.2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
