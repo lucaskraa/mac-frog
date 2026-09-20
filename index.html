@@ -37,12 +37,14 @@
 
     const macAnim = {
       state: "idle",
+      previousState: "idle",
       frame: 0,
       timer: 0,
       seqPos: 0,
-      smoothedSpeed: 0,
+
       locomotionState: "idle",
-      lastLocomotionState: "idle"
+      locomotionPhase: 0,
+      smoothedSpeed: 0
     };
 
     const MAC_SPRITE_BOX = {
@@ -60,6 +62,14 @@
       grapple: { width: 104, height: 156, leadX: 0, yOffset: 0 },
       swallowWater: { width: 104, height: 156, leadX: 0, yOffset: 0 },
       swallowWind: { width: 104, height: 156, leadX: 0, yOffset: 0 }
+    };
+
+    const MAC_FRAME_BASELINES = {
+      idle: { bottom: 657, strength: 0.25 },
+      walk: { bottom: 650, strength: 0.45 },
+      run: { bottom: 566, strength: 0.72 },
+      roll: { bottom: 559, strength: 0.58 },
+      tongue: { bottom: 618, strength: 0.35 }
     };
 
     const MAC_MOUTH_ANCHORS = {
@@ -110,171 +120,497 @@
       mac.vx = 0;
     }
 
+    function isLocomotionState(state) {
+      return (
+        state === "idle" ||
+        state === "walk" ||
+        state === "run"
+      );
+    }
+
     function setMacAnimState(state) {
-      if (macAnim.state === state) return;
+      if (macAnim.state === state) {
+        return;
+      }
 
-      const prevState = macAnim.state;
-      const prevSeq = macAnim.seqPos;
-      const locomotion = new Set(["idle", "walk", "run"]);
+      const previous =
+        macAnim.state;
 
-      macAnim.state = state;
+      macAnim.previousState =
+        previous;
+
+      macAnim.state =
+        state;
+
       macAnim.frame = 0;
       macAnim.timer = 0;
+      macAnim.seqPos = 0;
 
-      if (prevState === "walk" && state === "run") {
-        macAnim.seqPos = prevSeq % 8;
-      } else if (prevState === "run" && state === "walk") {
-        macAnim.seqPos = prevSeq % 8;
-      } else if (!(locomotion.has(prevState) && locomotion.has(state))) {
-        macAnim.seqPos = 0;
+      // Walk <-> run conserva a fase das pernas.
+      // Idle -> movimento começa num contato limpo.
+      if (
+        previous === "idle" &&
+        (
+          state === "walk" ||
+          state === "run"
+        )
+      ) {
+        macAnim.locomotionPhase = 0;
+      }
+
+      if (
+        !isLocomotionState(previous) &&
+        isLocomotionState(state)
+      ) {
+        macAnim.locomotionPhase = 0;
       }
     }
 
-    function getLocomotionState(rawSpeed) {
-      macAnim.smoothedSpeed += (rawSpeed - macAnim.smoothedSpeed) * 0.20;
-      const speed = macAnim.smoothedSpeed;
-      const current = macAnim.locomotionState;
+    function updateSmoothedSpeed(rawSpeed) {
+      const response = 0.22;
 
+      macAnim.smoothedSpeed +=
+        (
+          rawSpeed -
+          macAnim.smoothedSpeed
+        ) *
+        response;
+
+      return macAnim.smoothedSpeed;
+    }
+
+    function getLocomotionState(rawSpeed) {
+      const speed =
+        updateSmoothedSpeed(
+          rawSpeed
+        );
+
+      const current =
+        macAnim.locomotionState;
+
+      // Histerese evita idle/walk/run piscando entre estados.
       if (current === "idle") {
-        if (speed > 215) macAnim.locomotionState = "run";
-        else if (speed > 18) macAnim.locomotionState = "walk";
+        if (speed > 235) {
+          macAnim.locomotionState = "run";
+        } else if (speed > 16) {
+          macAnim.locomotionState = "walk";
+        }
       } else if (current === "walk") {
-        if (speed < 10) macAnim.locomotionState = "idle";
-        else if (speed > 255) macAnim.locomotionState = "run";
+        if (speed < 8) {
+          macAnim.locomotionState = "idle";
+        } else if (speed > 270) {
+          macAnim.locomotionState = "run";
+        }
       } else if (current === "run") {
-        if (speed < 185) macAnim.locomotionState = "walk";
+        if (speed < 190) {
+          macAnim.locomotionState = "walk";
+        }
       }
 
       return macAnim.locomotionState;
     }
 
     function getMacAnimState() {
-      if (mac.swallowTimer > 0 && mac.swallowType) {
-        return mac.swallowType === "wind" ? "swallowWind" : "swallowWater";
+      if (
+        mac.swallowTimer > 0 &&
+        mac.swallowType
+      ) {
+        return (
+          mac.swallowType === "wind"
+            ? "swallowWind"
+            : "swallowWater"
+        );
       }
-      if (grapple.active) return "grapple";
-      if (tongue.active) return "tongue";
-      if (mac.rolling) return "roll";
-      if (!mac.grounded || mac.landingTimer > 0) return "jump";
 
-      const speed = Math.abs(mac.vx);
-      return getLocomotionState(speed);
+      if (grapple.active) {
+        return "grapple";
+      }
+
+      if (tongue.active) {
+        return "tongue";
+      }
+
+      if (mac.rolling) {
+        return "roll";
+      }
+
+      if (
+        !mac.grounded ||
+        mac.takeoffTimer > 0 ||
+        mac.landingTimer > 0
+      ) {
+        return "jump";
+      }
+
+      return getLocomotionState(
+        Math.abs(mac.vx)
+      );
     }
 
-    function advanceSequence(dt, sequence, durations, speedScale = 1) {
-      const durationList = Array.isArray(durations)
-        ? durations
-        : sequence.map(() => durations);
-
-      macAnim.timer += dt * speedScale;
-
-      while (macAnim.timer >= durationList[macAnim.seqPos]) {
-        macAnim.timer -= durationList[macAnim.seqPos];
-        macAnim.seqPos = (macAnim.seqPos + 1) % sequence.length;
+    function advanceSequence(
+      dt,
+      sequence,
+      durations,
+      speedScale = 1
+    ) {
+      if (!sequence.length) {
+        macAnim.frame = 0;
+        return 0;
       }
 
-      macAnim.frame = sequence[macAnim.seqPos];
+      // Defesa contra índice herdado de outro clip.
+      macAnim.seqPos =
+        Math.max(
+          0,
+          Math.min(
+            sequence.length - 1,
+            macAnim.seqPos | 0
+          )
+        );
+
+      const durationList =
+        Array.isArray(durations)
+          ? durations
+          : sequence.map(
+              () => durations
+            );
+
+      macAnim.timer +=
+        dt * speedScale;
+
+      let safety = 0;
+
+      while (
+        macAnim.timer >=
+          durationList[
+            macAnim.seqPos
+          ] &&
+        safety < 4
+      ) {
+        macAnim.timer -=
+          durationList[
+            macAnim.seqPos
+          ];
+
+        macAnim.seqPos =
+          (
+            macAnim.seqPos + 1
+          ) %
+          sequence.length;
+
+        safety += 1;
+      }
+
+      macAnim.frame =
+        sequence[
+          macAnim.seqPos
+        ];
+
       return macAnim.frame;
     }
 
-    function updateMacAnimation(dt) {
-      const state = getMacAnimState();
-      setMacAnimState(state);
+    function setLocomotionFrame(
+      dt,
+      state,
+      speed
+    ) {
+      const frameCount =
+        MAC_ATLAS_META[
+          state
+        ].length;
 
-      const count = MAC_ATLAS_META[state].length;
-      const rawSpeed = Math.abs(mac.vx);
-      const speed = macAnim.smoothedSpeed;
+      // Um ciclo por "stride" de distância.
+      // Isso deixa os pés sincronizados com a velocidade,
+      // mas não pula frames a 60 Hz.
+      const stride =
+        state === "run"
+          ? 205
+          : 150;
+
+      const minCycles =
+        state === "run"
+          ? 1.20
+          : 0.80;
+
+      const cyclesPerSecond =
+        Math.max(
+          minCycles,
+          speed /
+            Math.max(
+              1,
+              stride
+            )
+        );
+
+      macAnim.locomotionPhase =
+        (
+          macAnim.locomotionPhase +
+          cyclesPerSecond *
+            dt
+        ) % 1;
+
+      const frameFloat =
+        macAnim.locomotionPhase *
+        frameCount;
+
+      macAnim.frame =
+        Math.floor(
+          frameFloat
+        ) %
+        frameCount;
+    }
+
+    function validateMacAnimFrame() {
+      const frames =
+        MAC_ATLAS_META[
+          macAnim.state
+        ];
+
+      if (
+        !frames ||
+        !frames.length ||
+        !Number.isFinite(
+          macAnim.frame
+        )
+      ) {
+        macAnim.frame = 0;
+        return;
+      }
+
+      macAnim.frame =
+        Math.max(
+          0,
+          Math.min(
+            frames.length - 1,
+            Math.floor(
+              macAnim.frame
+            )
+          )
+        );
+    }
+
+    function updateMacAnimation(dt) {
+      const state =
+        getMacAnimState();
+
+      setMacAnimState(
+        state
+      );
+
+      const count =
+        MAC_ATLAS_META[
+          state
+        ].length;
+
+      const speed =
+        Math.max(
+          0,
+          macAnim.smoothedSpeed
+        );
 
       if (state === "idle") {
         advanceSequence(
           dt,
-          [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1],
-          [0.13, 0.11, 0.10, 0.095, 0.10, 0.11, 0.12, 0.14, 0.12, 0.11, 0.10, 0.095, 0.10, 0.11]
+          [
+            0, 1, 2, 3,
+            4, 5, 6, 7,
+            6, 5, 4, 3,
+            2, 1
+          ],
+          [
+            0.14, 0.12, 0.11, 0.10,
+            0.11, 0.12, 0.13, 0.15,
+            0.13, 0.12, 0.11, 0.10,
+            0.11, 0.12
+          ]
         );
+
+        validateMacAnimFrame();
         return;
       }
 
-      if (state === "walk") {
-        const walkScale = 0.92 + Math.min(0.34, speed / Math.max(1, mac.walkSpeed) * 0.34);
-        advanceSequence(
+      if (
+        state === "walk" ||
+        state === "run"
+      ) {
+        setLocomotionFrame(
           dt,
-          [0, 1, 2, 3, 4, 5, 6, 7],
-          [0.115, 0.085, 0.072, 0.082, 0.115, 0.085, 0.072, 0.082],
-          walkScale
+          state,
+          speed
         );
-        return;
-      }
 
-      if (state === "run") {
-        const runScale = 0.98 + Math.min(0.42, speed / Math.max(1, mac.runSpeed) * 0.42);
-        advanceSequence(
-          dt,
-          [0, 1, 2, 3, 4, 5, 6, 7],
-          [0.092, 0.068, 0.058, 0.064, 0.092, 0.068, 0.058, 0.064],
-          runScale
-        );
+        validateMacAnimFrame();
         return;
       }
 
       if (state === "jump") {
-        if (mac.takeoffTimer > 0) {
+        if (
+          mac.takeoffTimer > 0
+        ) {
           macAnim.frame = 0;
-        } else if (mac.landingTimer > 0) {
-          macAnim.frame = count - 1;
-        } else if (mac.vy < -430) {
-          macAnim.frame = 0;
-        } else if (mac.vy < -180) {
+        } else if (
+          mac.landingTimer > 0
+        ) {
+          macAnim.frame =
+            count - 1;
+        } else if (
+          mac.vy < -430
+        ) {
           macAnim.frame = 1;
-        } else if (mac.vy < 30) {
+        } else if (
+          mac.vy < -160
+        ) {
           macAnim.frame = 2;
-        } else if (mac.vy < 210) {
+        } else if (
+          mac.vy < 80
+        ) {
           macAnim.frame = 3;
-        } else if (mac.vy < 430) {
+        } else if (
+          mac.vy < 360
+        ) {
           macAnim.frame = 4;
         } else {
-          macAnim.frame = count - 1;
+          macAnim.frame =
+            count - 1;
         }
+
+        validateMacAnimFrame();
         return;
       }
 
       if (state === "roll") {
-        const sequence = [0, 1, 1, 2, 3, 4, 5, 5, 4, 3, 2];
-        const progress = 1 - Math.max(0, mac.rollTimer) / mac.rollDuration;
-        macAnim.frame = sequence[
-          Math.min(sequence.length - 1, Math.floor(progress * sequence.length))
-        ];
+        const progress =
+          1 -
+          Math.max(
+            0,
+            mac.rollTimer
+          ) /
+          Math.max(
+            0.001,
+            mac.rollDuration
+          );
+
+        // 6 quadros em ordem, sem voltar e sem frame pulado.
+        macAnim.frame =
+          Math.min(
+            count - 1,
+            Math.floor(
+              progress *
+              count
+            )
+          );
+
+        validateMacAnimFrame();
         return;
       }
 
       if (state === "tongue") {
-        const progress = Math.max(0, Math.min(1, tongue.length / Math.max(1, tongue.maxLength)));
-        const sequence = tongue.retracting
-          ? [5, 4, 3, 2, 1, 0]
-          : [0, 1, 2, 3, 4, 5];
+        const progress =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              tongue.length /
+              Math.max(
+                1,
+                tongue.maxLength
+              )
+            )
+          );
 
-        macAnim.frame = sequence[
-          Math.min(sequence.length - 1, Math.floor(progress * (sequence.length - 1)))
-        ];
+        const forward =
+          [0, 1, 2, 3, 4, 5];
+
+        const reverse =
+          [5, 4, 3, 2, 1, 0];
+
+        const sequence =
+          tongue.retracting
+            ? reverse
+            : forward;
+
+        const index =
+          Math.min(
+            sequence.length - 1,
+            Math.floor(
+              progress *
+              (
+                sequence.length - 1
+              )
+            )
+          );
+
+        macAnim.frame =
+          sequence[index];
+
+        validateMacAnimFrame();
         return;
       }
 
       if (state === "grapple") {
-        const center = getMacCenter();
-        const dx = center.x - grapplePoint.x;
-        const ratio = Math.max(-1, Math.min(1, dx / Math.max(1, grapple.ropeLength)));
+        // Pose acompanha velocidade angular real do pêndulo.
+        const normalized =
+          Math.max(
+            -1,
+            Math.min(
+              1,
+              grapple.angularVelocity /
+              Math.max(
+                0.001,
+                grapple.maxAngularSpeed
+              )
+            )
+          );
 
-        if (ratio < -0.55) macAnim.frame = 0;
-        else if (ratio < -0.18) macAnim.frame = 1;
-        else if (ratio < 0.18) macAnim.frame = 2;
-        else if (ratio < 0.55) macAnim.frame = 3;
-        else macAnim.frame = 4;
+        macAnim.frame =
+          Math.max(
+            0,
+            Math.min(
+              count - 1,
+              Math.round(
+                (
+                  normalized *
+                  0.5 +
+                  0.5
+                ) *
+                (
+                  count - 1
+                )
+              )
+            )
+          );
 
+        validateMacAnimFrame();
         return;
       }
 
-      if (state === "swallowWater" || state === "swallowWind") {
-        const progress = 1 - Math.max(0, mac.swallowTimer) / mac.swallowDuration;
-        macAnim.frame = Math.min(count - 1, Math.floor(progress * count));
+      if (
+        state ===
+          "swallowWater" ||
+        state ===
+          "swallowWind"
+      ) {
+        const progress =
+          1 -
+          Math.max(
+            0,
+            mac.swallowTimer
+          ) /
+          Math.max(
+            0.001,
+            mac.swallowDuration
+          );
+
+        macAnim.frame =
+          Math.min(
+            count - 1,
+            Math.floor(
+              progress *
+              count
+            )
+          );
+
+        validateMacAnimFrame();
       }
     }
 
@@ -387,16 +723,29 @@
           state
         ];
 
-      const frame =
-        frames[
-          Math.max(
-            0,
-            Math.min(
-              frames.length - 1,
+      const safeFrameIndex =
+        Math.max(
+          0,
+          Math.min(
+            frames.length - 1,
+            Number.isFinite(
               frameIndex
             )
+              ? Math.floor(
+                  frameIndex
+                )
+              : 0
           )
+        );
+
+      const frame =
+        frames[
+          safeFrameIndex
         ];
+
+      if (!frame) {
+        return;
+      }
 
       const source =
         MAC_SOURCE_SIZE[
@@ -409,13 +758,31 @@
         ] ||
         MAC_DRAW.idle;
 
-      const scaleX =
-        cfg.width /
-        source.w;
+      const uniformScale =
+        Math.min(
+          cfg.height /
+            source.h,
+          cfg.width /
+            source.w
+        );
 
-      const scaleY =
-        cfg.height /
-        source.h;
+      const renderedCellWidth =
+        source.w *
+        uniformScale;
+
+      const renderedCellHeight =
+        source.h *
+        uniformScale;
+
+      const cellOffsetX =
+        (
+          cfg.width -
+          renderedCellWidth
+        ) / 2;
+
+      const cellOffsetY =
+        cfg.height -
+        renderedCellHeight;
 
       const lead =
         mac.facing === 1
@@ -436,30 +803,54 @@
         cfg.yOffset +
         actionY;
 
+      const baseline =
+        MAC_FRAME_BASELINES[
+          state
+        ];
+
+      let visualBaselineOffsetY = 0;
+
+      if (baseline) {
+        const actualBottom =
+          frame.oy +
+          frame.h;
+
+        visualBaselineOffsetY =
+          (
+            baseline.bottom -
+            actualBottom
+          ) *
+          uniformScale *
+          baseline.strength;
+      }
+
       const dx =
         Math.round(
           baseX +
+          cellOffsetX +
           frame.ox *
-            scaleX
+            uniformScale
         );
 
       const dy =
         Math.round(
           baseY +
+          cellOffsetY +
           frame.oy *
-            scaleY
+            uniformScale +
+          visualBaselineOffsetY
         );
 
       const dw =
         Math.ceil(
           frame.w *
-          scaleX
+          uniformScale
         );
 
       const dh =
         Math.ceil(
           frame.h *
-          scaleY
+          uniformScale
         );
 
       const tint =
@@ -494,22 +885,19 @@
             0,
             mac.rollTimer
           ) /
-          mac.rollDuration;
+          Math.max(
+            0.001,
+            mac.rollDuration
+          );
 
-        extraRotation +=
-          (
-            -0.22 +
-            progress *
-              0.44
-          ) *
-          mac.facing;
-
+        // O próprio sprite já contém a rotação.
+        // Só um pequeno arco vertical para dar peso.
         extraYOffset +=
           Math.sin(
             progress *
             Math.PI
           ) *
-          3;
+          2;
       } else if (
         macAnim.state ===
         "grapple"
@@ -522,19 +910,19 @@
             Math.min(
               0.16,
               -grapple.angularVelocity *
-              0.055
+              0.045
             )
           );
 
         extraRotation +=
-          angularLean;
+          angularLean * 0.72;
       } else if (
         mac.landingTimer > 0
       ) {
         const p =
           1 -
           mac.landingTimer /
-          0.12;
+          0.15;
 
         extraYOffset +=
           Math.sin(
@@ -613,10 +1001,13 @@
           frame.y,
           frame.w,
           frame.h,
-          frame.ox *
-            scaleX,
-          frame.oy *
-            scaleY,
+          cellOffsetX +
+            frame.ox *
+            uniformScale,
+          cellOffsetY +
+            frame.oy *
+            uniformScale +
+            visualBaselineOffsetY,
           dw,
           dh
         );
@@ -3755,12 +4146,18 @@
           direction !== 0;
 
         const acceleration =
-          running
-            ? 2450
-            : 2150;
+          mac.grounded
+            ? (
+                running
+                  ? 2450
+                  : 2150
+              )
+            : 920;
 
         const deceleration =
-          3150;
+          mac.grounded
+            ? 3150
+            : 260;
 
         mac.vx =
           approachValue(
@@ -3801,7 +4198,7 @@
         mac.grounded
       ) {
         mac.landingTimer =
-          0.12;
+          0.14;
       }
     }
 
@@ -3824,7 +4221,28 @@
 
       if (mac.landingTimer > 0) {
         mac.landingTimer -= dt;
-        if (mac.landingTimer < 0) mac.landingTimer = 0;
+
+        if (mac.landingTimer < 0) {
+          mac.landingTimer = 0;
+        }
+      }
+
+      if (mac.takeoffTimer > 0) {
+        mac.takeoffTimer -= dt;
+
+        if (mac.takeoffTimer < 0) {
+          mac.takeoffTimer = 0;
+        }
+      }
+
+      if (mac.castTimer > 0) {
+        mac.castTimer -= dt;
+
+        if (mac.castTimer <= 0) {
+          mac.castTimer = 0;
+          mac.castDuration = 0;
+          mac.castType = null;
+        }
       }
 
       if (mac.swallowTimer > 0) {
@@ -4275,28 +4693,106 @@
 
 
     function getVisualTongueOrigin() {
-      const state = grapple.active ? "grapple" : "tongue";
-      const cfg = MAC_DRAW[state];
-      const lead = mac.facing === 1 ? cfg.leadX : -cfg.leadX;
+      const state =
+        grapple.active
+          ? "grapple"
+          : "tongue";
+
+      const cfg =
+        MAC_DRAW[state];
+
+      const source =
+        MAC_SOURCE_SIZE[state];
+
+      const uniformScale =
+        Math.min(
+          cfg.height /
+            source.h,
+          cfg.width /
+            source.w
+        );
+
+      const renderedWidth =
+        source.w *
+        uniformScale;
+
+      const cellOffsetX =
+        (
+          cfg.width -
+          renderedWidth
+        ) / 2;
+
+      const lead =
+        mac.facing === 1
+          ? cfg.leadX
+          : -cfg.leadX;
 
       const baseX =
-        mac.x + mac.width / 2 - cfg.width / 2 + lead;
+        mac.x +
+        mac.width / 2 -
+        cfg.width / 2 +
+        lead;
 
       const baseY =
-        mac.y + mac.height - cfg.height + cfg.yOffset;
+        mac.y +
+        mac.height -
+        cfg.height +
+        cfg.yOffset;
 
-      const anchors = MAC_MOUTH_ANCHORS[state];
-      const currentFrame = Math.max(0, Math.min(anchors.length - 1, macAnim.frame));
-      const anchor = anchors[currentFrame];
+      const anchors =
+        MAC_MOUTH_ANCHORS[
+          state
+        ];
 
-      const rightX = cfg.width * anchor.x;
-      const leftX = cfg.width * (1 - anchor.x);
-      const localX = mac.facing === 1 ? rightX : leftX;
-      const localY = cfg.height * anchor.y;
+      const currentFrame =
+        Math.max(
+          0,
+          Math.min(
+            anchors.length - 1,
+            macAnim.frame | 0
+          )
+        );
+
+      const anchor =
+        anchors[
+          currentFrame
+        ];
+
+      const sourceLocalX =
+        source.w *
+        anchor.x *
+        uniformScale;
+
+      const rightX =
+        cellOffsetX +
+        sourceLocalX;
+
+      const leftX =
+        cfg.width -
+        rightX;
+
+      const localX =
+        mac.facing === 1
+          ? rightX
+          : leftX;
+
+      const localY =
+        source.h *
+        anchor.y *
+        uniformScale;
 
       return {
-        x: Math.round(baseX + localX),
-        y: Math.round(baseY + localY)
+        x:
+          Math.round(
+            baseX +
+            localX
+          ),
+
+        y:
+          Math.round(
+            baseY +
+            localY
+          )
       };
     }
 
@@ -4359,9 +4855,44 @@
       const holdBump = tongue.contactHoldTimer > 0 ? 1 : 0;
       const ctrlX1 = origin.x + (endX - origin.x) * 0.28;
       const ctrlX2 = origin.x + (endX - origin.x) * 0.72;
-      const ctrlY1 = origin.y + (tongue.retracting ? 1 : -3) - holdBump;
-      const ctrlY2 = origin.y + (tongue.retracting ? 1 : -2) - holdBump;
-      const half = tongue.thickness * 0.52;
+      const lengthRatio =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            tongue.length /
+            Math.max(
+              1,
+              tongue.maxLength
+            )
+          )
+        );
+
+      const curveLift =
+        (
+          tongue.retracting
+            ? 0.8
+            : -2.2
+        ) *
+        lengthRatio;
+
+      const ctrlY1 =
+        origin.y +
+        curveLift -
+        holdBump;
+
+      const ctrlY2 =
+        origin.y +
+        curveLift * 0.72 -
+        holdBump;
+
+      const half =
+        tongue.thickness *
+        (
+          0.46 +
+          0.06 *
+          lengthRatio
+        );
       const dir = mac.facing;
       const tipBaseX = endX - dir * 6;
 
