@@ -15,16 +15,19 @@
 (async () => {
   const status = document.getElementById('status');
   try {
-    const [gameResponse, patchResponse] = await Promise.all([
+    const [gameResponse, patchResponse, roomV2Response] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
-      fetch('./cenario1.txt', {cache:'no-store'})
+      fetch('./cenario1.txt', {cache:'no-store'}),
+      fetch('./scenario_room1_v2.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
     if (!patchResponse.ok) throw new Error('cenario1.txt não carregou');
+    if (!roomV2Response.ok) throw new Error('scenario_room1_v2.js não carregou');
 
     let game = await gameResponse.text();
     const patch = await patchResponse.text();
+    const roomV2 = await roomV2Response.text();
 
     game = game.replace(
       'const WORLD_WIDTH = 3000;',
@@ -43,7 +46,7 @@
 
     game = game.replace(
       bootMarker,
-      '\n' + patch + '\n\n' + bootMarker
+      '\n' + patch + '\n\n' + roomV2 + '\n\n' + bootMarker
     );
 
     document.open();
