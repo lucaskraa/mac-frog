@@ -605,3 +605,1011 @@ update = function(dt) {
     rebuildSolids();
   }
 };
+
+
+// ============================================================
+// ROOM 1 V3 — CC0 ONLINE PIXEL ART ASSETS
+// Fontes CC0:
+// - surt — Classical Ruin Tiles
+//   https://opengameart.org/content/classical-ruin-tiles
+// - Neburov — Pixel platformer tile set
+//   https://opengameart.org/content/pixel-platformer-tile-set
+// - Kthulhu1947 — TileSet 2D Platformer 32x32
+//   https://opengameart.org/content/tileset-2d-platformer-32x32
+//
+// Os assets remotos são usados como camada gráfica. Se algum falhar,
+// o cenário V2 continua desenhando o fallback já existente.
+// ============================================================
+
+const ROOM1V3_ASSET_URLS = {
+  ruins:
+    "https://opengameart.org/sites/default/files/classical_ruin_tiles_1.png",
+
+  platform:
+    "https://opengameart.org/sites/default/files/Sprute.png",
+
+  mud:
+    "https://opengameart.org/sites/default/files/platFormTileSet02_32x32.png"
+};
+
+const ROOM1V3_ASSETS = {
+  ruins: new Image(),
+  platform: new Image(),
+  mud: new Image()
+};
+
+ROOM1V3_ASSETS.ruins.decoding = "async";
+ROOM1V3_ASSETS.platform.decoding = "async";
+ROOM1V3_ASSETS.mud.decoding = "async";
+
+ROOM1V3_ASSETS.ruins.src =
+  ROOM1V3_ASSET_URLS.ruins;
+
+ROOM1V3_ASSETS.platform.src =
+  ROOM1V3_ASSET_URLS.platform;
+
+ROOM1V3_ASSETS.mud.src =
+  ROOM1V3_ASSET_URLS.mud;
+
+function room1v3Ready(image) {
+  return (
+    image &&
+    image.complete &&
+    image.naturalWidth > 0 &&
+    image.naturalHeight > 0
+  );
+}
+
+function room1v3DrawImage(
+  image,
+  sx,
+  sy,
+  sw,
+  sh,
+  dx,
+  dy,
+  dw,
+  dh,
+  opts = {}
+) {
+  if (!room1v3Ready(image)) {
+    return false;
+  }
+
+  ctx.save();
+
+  ctx.imageSmoothingEnabled = false;
+
+  if (opts.alpha != null) {
+    ctx.globalAlpha =
+      opts.alpha;
+  }
+
+  if (opts.filter) {
+    ctx.filter =
+      opts.filter;
+  }
+
+  if (opts.flipX) {
+    ctx.translate(
+      dx + dw,
+      dy
+    );
+
+    ctx.scale(
+      -1,
+      1
+    );
+
+    ctx.drawImage(
+      image,
+      sx,
+      sy,
+      sw,
+      sh,
+      0,
+      0,
+      dw,
+      dh
+    );
+  } else {
+    ctx.drawImage(
+      image,
+      sx,
+      sy,
+      sw,
+      sh,
+      dx,
+      dy,
+      dw,
+      dh
+    );
+  }
+
+  ctx.restore();
+
+  return true;
+}
+
+function room1v3DrawTile(
+  image,
+  tileX,
+  tileY,
+  dx,
+  dy,
+  size = 32,
+  opts = {}
+) {
+  return room1v3DrawImage(
+    image,
+    tileX * 32,
+    tileY * 32,
+    32,
+    32,
+    dx,
+    dy,
+    size,
+    size,
+    opts
+  );
+}
+
+// ------------------------------------------------------------
+// Asset-based stone.
+// Sprute.png tem tiles 32x32 e funciona muito melhor que blocos
+// lisos para a leitura da colisão.
+// ------------------------------------------------------------
+
+function room1v3DrawStonePlatform(
+  rect,
+  wall = false
+) {
+  if (
+    !room1v3Ready(
+      ROOM1V3_ASSETS.platform
+    )
+  ) {
+    room1v2Stone(
+      rect,
+      wall
+    );
+
+    return;
+  }
+
+  const tileSize = 32;
+
+  const topY =
+    Math.floor(
+      rect.y /
+      tileSize
+    ) *
+    tileSize;
+
+  // Sprute:
+  // teal brick = 0,2
+  // dark earth = 7,0
+  // grass / damp earth = 7,2
+  const brickTile = {
+    x: 0,
+    y: 2
+  };
+
+  const bodyTile = {
+    x: 7,
+    y: 0
+  };
+
+  const mossTile = {
+    x: 7,
+    y: 2
+  };
+
+  for (
+    let y =
+      topY;
+    y <
+      rect.y +
+      rect.height;
+    y += tileSize
+  ) {
+    for (
+      let x =
+        Math.floor(
+          rect.x /
+          tileSize
+        ) *
+        tileSize;
+      x <
+        rect.x +
+        rect.width;
+      x += tileSize
+    ) {
+      const firstRow =
+        y <= rect.y + 4;
+
+      const tx =
+        firstRow
+          ? brickTile.x
+          : bodyTile.x;
+
+      const ty =
+        firstRow
+          ? brickTile.y
+          : bodyTile.y;
+
+      room1v3DrawTile(
+        ROOM1V3_ASSETS.platform,
+        tx,
+        ty,
+        x,
+        y,
+        tileSize,
+        {
+          filter:
+            wall
+              ? "hue-rotate(12deg) saturate(.70) brightness(.62)"
+              : "hue-rotate(10deg) saturate(.80) brightness(.74)"
+        }
+      );
+    }
+  }
+
+  // Corrige exatamente a superfície jogável.
+  for (
+    let x =
+      rect.x;
+    x <
+      rect.x +
+      rect.width;
+    x += tileSize
+  ) {
+    ctx.save();
+
+    ctx.beginPath();
+
+    ctx.rect(
+      x,
+      rect.y - 3,
+      Math.min(
+        tileSize,
+        rect.x +
+          rect.width -
+          x
+      ),
+      12
+    );
+
+    ctx.clip();
+
+    room1v3DrawTile(
+      ROOM1V3_ASSETS.platform,
+      mossTile.x,
+      mossTile.y,
+      x,
+      rect.y - 22,
+      tileSize,
+      {
+        filter:
+          "hue-rotate(8deg) saturate(.88) brightness(.78)"
+      }
+    );
+
+    ctx.restore();
+  }
+
+  // Profundidade / sombra da borda.
+  ctx.fillStyle =
+    wall
+      ? "rgba(1,13,18,.40)"
+      : "rgba(1,13,18,.25)";
+
+  ctx.fillRect(
+    rect.x,
+    rect.y +
+      rect.height -
+      5,
+    rect.width,
+    5
+  );
+}
+
+function room1v3DrawWoodPlatform(
+  rect
+) {
+  // O próprio tileset do Neburov possui tábuas e caixas.
+  if (
+    room1v3Ready(
+      ROOM1V3_ASSETS.platform
+    )
+  ) {
+    const tileSize = 32;
+
+    for (
+      let x =
+        rect.x;
+      x <
+        rect.x +
+        rect.width;
+      x += tileSize
+    ) {
+      // Tile de madeira/plataforma do canto inferior esquerdo.
+      room1v3DrawTile(
+        ROOM1V3_ASSETS.platform,
+        1,
+        6,
+        x,
+        rect.y - 6,
+        tileSize,
+        {
+          filter:
+            "saturate(.72) brightness(.68)"
+        }
+      );
+    }
+
+    ctx.fillStyle =
+      "rgba(18,12,10,.55)";
+
+    ctx.fillRect(
+      rect.x,
+      rect.y +
+        rect.height -
+        4,
+      rect.width,
+      6
+    );
+
+    return;
+  }
+
+  room1v2Wood(
+    rect
+  );
+}
+
+// ------------------------------------------------------------
+// Ruínas CC0 como verdadeiros sprites de landmark.
+// O atlas do surt é 640x256.
+// ------------------------------------------------------------
+
+function room1v3DrawRuinLandmarks() {
+  if (
+    !room1v3Ready(
+      ROOM1V3_ASSETS.ruins
+    )
+  ) {
+    return;
+  }
+
+  const backFilter =
+    "hue-rotate(132deg) saturate(.44) brightness(.40) contrast(1.08)";
+
+  const middleFilter =
+    "hue-rotate(126deg) saturate(.52) brightness(.52) contrast(1.05)";
+
+  // Ruína de entrada.
+  room1v3DrawImage(
+    ROOM1V3_ASSETS.ruins,
+    0,
+    0,
+    255,
+    256,
+    220,
+    305,
+    510,
+    512,
+    {
+      filter:
+        middleFilter,
+      alpha:
+        .78
+    }
+  );
+
+  // Claustro / torre no meio.
+  room1v3DrawImage(
+    ROOM1V3_ASSETS.ruins,
+    256,
+    0,
+    256,
+    256,
+    1230,
+    250,
+    640,
+    640,
+    {
+      filter:
+        middleFilter,
+      alpha:
+        .82
+    }
+  );
+
+  // Ruína atrás da árvore colossal.
+  room1v3DrawImage(
+    ROOM1V3_ASSETS.ruins,
+    0,
+    0,
+    255,
+    256,
+    2200,
+    235,
+    610,
+    610,
+    {
+      filter:
+        backFilter,
+      alpha:
+        .62,
+      flipX:
+        true
+    }
+  );
+
+  // Santuário alto.
+  room1v3DrawImage(
+    ROOM1V3_ASSETS.ruins,
+    256,
+    0,
+    256,
+    256,
+    2760,
+    100,
+    640,
+    640,
+    {
+      filter:
+        "hue-rotate(125deg) saturate(.52) brightness(.57) contrast(1.08)",
+      alpha:
+        .90
+    }
+  );
+
+  // Ruínas finais.
+  room1v3DrawImage(
+    ROOM1V3_ASSETS.ruins,
+    0,
+    0,
+    255,
+    256,
+    3900,
+    285,
+    650,
+    650,
+    {
+      filter:
+        middleFilter,
+      alpha:
+        .80
+    }
+  );
+}
+
+function room1v3DrawDistantRuins() {
+  if (
+    !room1v3Ready(
+      ROOM1V3_ASSETS.ruins
+    )
+  ) {
+    return;
+  }
+
+  ctx.save();
+
+  const px =
+    -(
+      (
+        camera.x *
+        .10
+      ) %
+      680
+    );
+
+  for (
+    let i = -1;
+    i < 4;
+    i++
+  ) {
+    room1v3DrawImage(
+      ROOM1V3_ASSETS.ruins,
+      256,
+      0,
+      256,
+      256,
+      px +
+        i * 680,
+      140,
+      560,
+      560,
+      {
+        filter:
+          "hue-rotate(135deg) saturate(.35) brightness(.30)",
+        alpha:
+          .35,
+        flipX:
+          i % 2 === 0
+      }
+    );
+  }
+
+  ctx.restore();
+}
+
+// ------------------------------------------------------------
+// Ground texture from a second CC0 32x32 pack.
+// ------------------------------------------------------------
+
+function room1v3GroundTexture(
+  segment
+) {
+  if (
+    !room1v3Ready(
+      ROOM1V3_ASSETS.mud
+    )
+  ) {
+    return;
+  }
+
+  ctx.save();
+
+  ctx.beginPath();
+
+  ctx.rect(
+    segment.x,
+    segment.y,
+    segment.width,
+    Math.min(
+      160,
+      segment.height
+    )
+  );
+
+  ctx.clip();
+
+  const size = 64;
+
+  for (
+    let y =
+      segment.y;
+    y <
+      segment.y +
+      160;
+    y += size
+  ) {
+    for (
+      let x =
+        segment.x;
+      x <
+        segment.x +
+        segment.width;
+      x += size
+    ) {
+      const sx =
+        (
+          Math.floor(
+            x /
+            size
+          ) %
+          4
+        );
+
+      const sy =
+        (
+          Math.floor(
+            y /
+            size
+          ) %
+          4
+        );
+
+      room1v3DrawTile(
+        ROOM1V3_ASSETS.mud,
+        sx,
+        sy,
+        x,
+        y,
+        size,
+        {
+          filter:
+            "hue-rotate(115deg) saturate(.50) brightness(.40) contrast(1.15)",
+          alpha:
+            .50
+        }
+      );
+    }
+  }
+
+  ctx.restore();
+}
+
+// ------------------------------------------------------------
+// Props from the free Neburov sprite sheet.
+// ------------------------------------------------------------
+
+function room1v3DrawCrate(
+  x,
+  y,
+  scale = 1
+) {
+  if (
+    !room1v3Ready(
+      ROOM1V3_ASSETS.platform
+    )
+  ) {
+    return;
+  }
+
+  room1v3DrawTile(
+    ROOM1V3_ASSETS.platform,
+    0,
+    3,
+    x,
+    y,
+    32 * scale,
+    {
+      filter:
+        "saturate(.72) brightness(.68)"
+    }
+  );
+}
+
+function room1v3DrawProps() {
+  room1v3DrawCrate(
+    390,
+    664,
+    1
+  );
+
+  room1v3DrawCrate(
+    430,
+    664,
+    .85
+  );
+
+  room1v3DrawCrate(
+    1815,
+    579,
+    1
+  );
+
+  room1v3DrawCrate(
+    3955,
+    589,
+    1
+  );
+
+  // Vegetação do mesmo atlas.
+  if (
+    room1v3Ready(
+      ROOM1V3_ASSETS.platform
+    )
+  ) {
+    const plants = [
+      [535, 598],
+      [1525, 510],
+      [2665, 355],
+      [3060, 217],
+      [3890, 592],
+      [4380, 430]
+    ];
+
+    for (
+      const [x, y]
+      of plants
+    ) {
+      room1v3DrawTile(
+        ROOM1V3_ASSETS.platform,
+        6,
+        6,
+        x,
+        y,
+        48,
+        {
+          filter:
+            "hue-rotate(25deg) saturate(.82) brightness(.68)"
+        }
+      );
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// Overrides finais.
+// ------------------------------------------------------------
+
+const __room1v3BackgroundFallback =
+  drawMangroveBackground;
+
+drawMangroveBackground = function() {
+  __room1v3BackgroundFallback();
+
+  // Distant ruins are placed in screen space,
+  // so the camera parallax is calculated inside.
+  room1v3DrawDistantRuins();
+
+  // Warm haze over the distant ruins.
+  const x =
+    WIDTH *
+    .70;
+
+  const g =
+    ctx.createRadialGradient(
+      x,
+      160,
+      10,
+      x,
+      160,
+      310
+    );
+
+  g.addColorStop(
+    0,
+    "rgba(255,188,99,.15)"
+  );
+
+  g.addColorStop(
+    1,
+    "rgba(255,188,99,0)"
+  );
+
+  ctx.fillStyle = g;
+
+  ctx.fillRect(
+    x - 320,
+    -30,
+    640,
+    520
+  );
+};
+
+drawWorldGeometry = function() {
+  for (
+    const segment
+    of MANGUE_V2_GROUND_SEGMENTS
+  ) {
+    const g =
+      ctx.createLinearGradient(
+        0,
+        segment.y,
+        0,
+        WORLD_HEIGHT
+      );
+
+    g.addColorStop(
+      0,
+      "#10282d"
+    );
+
+    g.addColorStop(
+      1,
+      "#07171b"
+    );
+
+    ctx.fillStyle = g;
+
+    ctx.fillRect(
+      segment.x,
+      segment.y,
+      segment.width,
+      segment.height
+    );
+
+    room1v3GroundTexture(
+      segment
+    );
+
+    ctx.fillStyle =
+      "#3f684b";
+
+    ctx.fillRect(
+      segment.x,
+      segment.y,
+      segment.width,
+      6
+    );
+  }
+
+  // Água continua procedural para poder animar,
+  // mas agora fica cercada pelos tiles reais.
+  const t =
+    performance.now() *
+    .001;
+
+  for (
+    const pit
+    of MANGUE_V2_PITS
+  ) {
+    const g =
+      ctx.createLinearGradient(
+        0,
+        ground.y,
+        0,
+        WORLD_HEIGHT
+      );
+
+    g.addColorStop(
+      0,
+      "#1b737a"
+    );
+
+    g.addColorStop(
+      .35,
+      "#0b4b57"
+    );
+
+    g.addColorStop(
+      1,
+      "#041d26"
+    );
+
+    ctx.fillStyle = g;
+
+    ctx.fillRect(
+      pit.x,
+      ground.y,
+      pit.width,
+      WORLD_HEIGHT -
+        ground.y
+    );
+
+    ctx.fillStyle =
+      "rgba(137,230,222,.55)";
+
+    ctx.fillRect(
+      pit.x,
+      ground.y,
+      pit.width,
+      3
+    );
+
+    ctx.fillStyle =
+      "rgba(181,237,226,.26)";
+
+    for (
+      let y =
+        ground.y + 13;
+      y <
+        WORLD_HEIGHT;
+      y += 25
+    ) {
+      const phase =
+        Math.round(
+          Math.sin(
+            t * 1.5 +
+            y * .025
+          ) *
+          9
+        );
+
+      for (
+        let x =
+          pit.x + 8;
+        x <
+          pit.x +
+          pit.width -
+          25;
+        x += 60
+      ) {
+        ctx.fillRect(
+          x + phase,
+          y,
+          28,
+          2
+        );
+      }
+    }
+  }
+
+  for (
+    const platform
+    of platforms
+  ) {
+    if (
+      room1v2PlatformStyle(
+        platform
+      ) === "wood"
+    ) {
+      room1v3DrawWoodPlatform(
+        platform
+      );
+    } else {
+      room1v3DrawStonePlatform(
+        platform,
+        false
+      );
+    }
+  }
+
+  for (
+    const wall
+    of walls
+  ) {
+    room1v3DrawStonePlatform(
+      wall,
+      true
+    );
+  }
+
+  if (
+    currentRoom === 0 &&
+    !mac.waterPower
+  ) {
+    const gate =
+      ROOM1_V2_WATER_GATE;
+
+    const gateGradient =
+      ctx.createLinearGradient(
+        gate.x,
+        0,
+        gate.x +
+          gate.width,
+        0
+      );
+
+    gateGradient.addColorStop(
+      0,
+      "#13333d"
+    );
+
+    gateGradient.addColorStop(
+      .50,
+      "#49a2aa"
+    );
+
+    gateGradient.addColorStop(
+      1,
+      "#13333d"
+    );
+
+    ctx.fillStyle =
+      gateGradient;
+
+    ctx.fillRect(
+      gate.x,
+      gate.y,
+      gate.width,
+      gate.height
+    );
+
+    ctx.fillStyle =
+      "rgba(145,243,239,.32)";
+
+    for (
+      let y =
+        gate.y + 10;
+      y <
+        gate.y +
+        gate.height;
+      y += 18
+    ) {
+      ctx.fillRect(
+        gate.x + 5,
+        y,
+        gate.width - 10,
+        3
+      );
+    }
+  }
+};
+
+const __room1v3DecorFallback =
+  drawMangroveWorldDecor;
+
+drawMangroveWorldDecor = function() {
+  if (
+    currentRoom !== 0
+  ) {
+    __room1v3DecorFallback();
+    return;
+  }
+
+  // Sprite landmarks first.
+  room1v3DrawRuinLandmarks();
+
+  // Existing procedural roots/tree/lanterns are kept
+  // because they blend the CC0 ruins into the mangrove biome.
+  __room1v3DecorFallback();
+
+  room1v3DrawProps();
+};
