@@ -627,3 +627,1802 @@ draw = function() {
   ctx.restore();
   drawHUD();
 };
+
+
+// ============================================================
+// AREA 1 V2 — RECONSTRUÇÃO DO MANGUE
+// - Buracos reais no chão.
+// - Língua usada como travessia obrigatória.
+// - Mosca azul em rota alta com timing.
+// - Arquitetura/vegetação mais integrada ao mapa.
+// ============================================================
+
+checkpoints[0].x = 2600;
+checkpoints[0].y = 690;
+
+grapple.minLength = 100;
+grapple.maxLength = 300;
+grapple.swingAcceleration = 8.2;
+grapple.maxAngularSpeed = 4.7;
+
+MANGUE_ROOM_0_PLATFORMS.splice(
+  0,
+  MANGUE_ROOM_0_PLATFORMS.length,
+  { x: 250,  y: 690, width: 190, height: 22 },
+  { x: 560,  y: 635, width: 190, height: 22 },
+  { x: 760,  y: 675, width: 145, height: 22 },
+
+  { x: 1285, y: 700, width: 190, height: 22 },
+  { x: 1485, y: 625, width: 180, height: 22 },
+  { x: 1690, y: 545, width: 175, height: 22 },
+  { x: 1880, y: 620, width: 180, height: 22 },
+
+  { x: 2500, y: 700, width: 230, height: 22 },
+  { x: 2705, y: 620, width: 180, height: 22 },
+  { x: 2875, y: 530, width: 170, height: 22 },
+  { x: 3045, y: 440, width: 170, height: 22 },
+  { x: 3210, y: 355, width: 190, height: 22 },
+
+  { x: 3750, y: 700, width: 220, height: 22 },
+  { x: 3990, y: 625, width: 190, height: 22 },
+  { x: 4225, y: 560, width: 195, height: 22 },
+  { x: 4465, y: 630, width: 195, height: 22 }
+);
+
+MANGUE_ROOM_0_WALLS.splice(
+  0,
+  MANGUE_ROOM_0_WALLS.length,
+  { x: 1210, y: 585, width: 50, height: 175 },
+  { x: 2025, y: 610, width: 48, height: 150 },
+  { x: 2420, y: 590, width: 50, height: 170 },
+  { x: 3655, y: 580, width: 48, height: 180 },
+  { x: 4670, y: 620, width: 44, height: 140 }
+);
+
+const MANGUE_V2_GROUND_SEGMENTS = [
+  { x: 0,    y: 760, width: 920,  height: WORLD_HEIGHT - 760 },
+  { x: 1260, y: 760, width: 840,  height: WORLD_HEIGHT - 760 },
+  { x: 2470, y: 760, width: 880,  height: WORLD_HEIGHT - 760 },
+  { x: 3730, y: 760, width: 1070, height: WORLD_HEIGHT - 760 }
+];
+
+const MANGUE_V2_PITS = [
+  { x: 920,  width: 340 },
+  { x: 2100, width: 370 },
+  { x: 3350, width: 380 }
+];
+
+const MANGUE_V2_ANCHORS = [
+  // Buraco 1: ensina a balançar.
+  { id: "raiz_ponte_1", x: 1085, y: 490, radius: 12, grabRange: 315, kind: "root" },
+
+  // Torre: rota alta opcional.
+  { id: "raiz_torre", x: 1765, y: 405, radius: 12, grabRange: 300, kind: "vine" },
+
+  // Buraco 2: travessia obrigatória.
+  { id: "raiz_ponte_2", x: 2290, y: 455, radius: 12, grabRange: 325, kind: "root" },
+
+  // Santuário da mosca azul: subida em dois tempos.
+  { id: "cipó_santuario_1", x: 2865, y: 445, radius: 12, grabRange: 300, kind: "vine" },
+  { id: "cipó_santuario_2", x: 3100, y: 345, radius: 12, grabRange: 290, kind: "vine" },
+
+  // Buraco 3: deixa o santuário usando a língua.
+  { id: "raiz_ponte_3", x: 3535, y: 470, radius: 12, grabRange: 335, kind: "root" }
+];
+
+let mangueV2SelectedAnchor = null;
+
+function getMangueV2AnchorCandidate() {
+  if (currentRoom !== 0) return null;
+
+  const origin = getTongueOrigin();
+  let best = null;
+  let bestDistance = Infinity;
+
+  for (const anchor of MANGUE_V2_ANCHORS) {
+    const d = distance(
+      origin.x,
+      origin.y,
+      anchor.x,
+      anchor.y
+    );
+
+    if (d > anchor.grabRange) continue;
+    if (!tongueLineClearToPoint(anchor.x, anchor.y)) continue;
+
+    const direction =
+      anchor.x >= origin.x
+        ? 1
+        : -1;
+
+    if (
+      direction !== mac.facing &&
+      d > 185
+    ) {
+      continue;
+    }
+
+    if (d < bestDistance) {
+      best = anchor;
+      bestDistance = d;
+    }
+  }
+
+  return best;
+}
+
+canGrabPoint = function() {
+  if (grapple.active) {
+    return true;
+  }
+
+  if (currentRoom === 0) {
+    const anchor =
+      getMangueV2AnchorCandidate();
+
+    if (!anchor) {
+      mangueV2SelectedAnchor = null;
+      return false;
+    }
+
+    mangueV2SelectedAnchor = anchor;
+
+    grapplePoint.x = anchor.x;
+    grapplePoint.y = anchor.y;
+    grapplePoint.radius = anchor.radius;
+    grapplePoint.grabRange = anchor.grabRange;
+
+    return true;
+  }
+
+  const origin = getTongueOrigin();
+
+  return (
+    distance(
+      origin.x,
+      origin.y,
+      grapplePoint.x,
+      grapplePoint.y
+    ) <= grapplePoint.grabRange &&
+    tongueLineClearToPoint(
+      grapplePoint.x,
+      grapplePoint.y
+    )
+  );
+};
+
+// Room 0 agora possui água entre blocos reais de chão.
+rebuildSolids = function() {
+  solids.length = 0;
+
+  if (currentRoom === 0) {
+    solids.push(
+      ...MANGUE_V2_GROUND_SEGMENTS,
+      ...platforms,
+      ...walls
+    );
+  } else {
+    solids.push(
+      ground,
+      ...platforms,
+      ...walls
+    );
+  }
+
+  if (boss.active && boss.alive) {
+    solids.push(bossGate);
+  }
+};
+
+// Inimigos agora podem viver em plataformas, não só no chão.
+mangueEnemies.splice(
+  0,
+  6,
+
+  makeMangueEnemy(
+    0,
+    "caranguejo",
+    590,
+    500,
+    820
+  ),
+
+  makeMangueEnemy(
+    0,
+    "cururu",
+    1380,
+    1290,
+    1600
+  ),
+
+  makeMangueEnemy(
+    0,
+    "caranguejo",
+    1900,
+    1800,
+    2050
+  ),
+
+  makeMangueEnemy(
+    0,
+    "caranguejo",
+    2590,
+    2490,
+    2740
+  ),
+
+  Object.assign(
+    makeMangueEnemy(
+      0,
+      "cururu",
+      2920,
+      2880,
+      3015,
+      {
+        patrolSpeed: 30,
+        chaseSpeed: 60,
+        detectionRange: 220,
+        damage: 13
+      }
+    ),
+    {
+      surfaceY: 530
+    }
+  ),
+
+  makeMangueEnemy(
+    0,
+    "cururu",
+    3900,
+    3770,
+    4100
+  ),
+
+  makeMangueEnemy(
+    0,
+    "caranguejo",
+    4390,
+    4270,
+    4560
+  )
+);
+
+resetMangueEnemies = function(room) {
+  for (const e of mangueEnemies) {
+    if (e.room !== room) continue;
+
+    if (typeof e.surfaceY !== "number") {
+      e.surfaceY = ground.y;
+    }
+
+    e.x = e.spawnX;
+    e.y = e.surfaceY - e.height;
+    e.hp = e.maxHp;
+    e.alive = true;
+    e.attackCooldownTimer = 0;
+    e.hurtTimer = 0;
+  }
+};
+
+updateOneMangueEnemy = function(e, dt) {
+  if (!e.alive) return;
+
+  if (typeof e.surfaceY !== "number") {
+    e.surfaceY = ground.y;
+  }
+
+  if (e.hurtTimer > 0) {
+    e.hurtTimer -= dt;
+  }
+
+  if (e.attackCooldownTimer > 0) {
+    e.attackCooldownTimer -= dt;
+  }
+
+  e.y =
+    e.surfaceY -
+    e.height;
+
+  const enemyCenter =
+    e.x +
+    e.width / 2;
+
+  const macCenter =
+    mac.x +
+    mac.width / 2;
+
+  const distanceToMac =
+    Math.abs(
+      macCenter -
+      enemyCenter
+    );
+
+  const verticalDistance =
+    Math.abs(
+      (
+        mac.y +
+        mac.height / 2
+      ) -
+      (
+        e.y +
+        e.height / 2
+      )
+    );
+
+  let speed =
+    e.patrolSpeed;
+
+  if (
+    !mac.dead &&
+    distanceToMac <= e.detectionRange &&
+    verticalDistance < 95
+  ) {
+    e.direction =
+      macCenter < enemyCenter
+        ? -1
+        : 1;
+
+    speed =
+      e.chaseSpeed;
+  } else {
+    if (e.x <= e.patrolMin) {
+      e.direction = 1;
+    }
+
+    if (
+      e.x +
+      e.width >=
+      e.patrolMax
+    ) {
+      e.direction = -1;
+    }
+  }
+
+  e.x +=
+    e.direction *
+    speed *
+    dt;
+
+  e.x =
+    Math.max(
+      e.patrolMin,
+      Math.min(
+        e.x,
+        e.patrolMax -
+        e.width
+      )
+    );
+
+  if (mac.dead) return;
+
+  const hitbox = {
+    x: e.x,
+    y: e.y,
+    width: e.width,
+    height: e.height
+  };
+
+  if (
+    rectsOverlap(
+      hitbox,
+      getMacHitbox()
+    ) &&
+    e.attackCooldownTimer <= 0
+  ) {
+    damageMac(
+      e.damage,
+      e.x +
+      e.width / 2
+    );
+
+    e.attackCooldownTimer =
+      e.attackCooldown;
+  }
+};
+
+const __mangueV1ApplyScenarioRoom =
+  applyScenarioRoom;
+
+applyScenarioRoom = function(index) {
+  if (index !== 0) {
+    __mangueV1ApplyScenarioRoom(index);
+
+    if (typeof enemy.surfaceY !== "number") {
+      enemy.surfaceY = ground.y;
+    }
+
+    return;
+  }
+
+  ground.width = WORLD_WIDTH;
+
+  setRoomGeometry(
+    MANGUE_ROOM_0_PLATFORMS,
+    MANGUE_ROOM_0_WALLS
+  );
+
+  // Primeiro ponto apenas inicia o sistema;
+  // canGrabPoint escolhe o ponto certo em tempo real.
+  grapplePoint.x =
+    MANGUE_V2_ANCHORS[0].x;
+
+  grapplePoint.y =
+    MANGUE_V2_ANCHORS[0].y;
+
+  grapplePoint.grabRange =
+    MANGUE_V2_ANCHORS[0].grabRange;
+
+  // Mosca azul agora fica no alto do santuário.
+  waterFly.baseX = 3280;
+  waterFly.x = waterFly.baseX;
+  waterFly.baseY = 305;
+  waterFly.y = waterFly.baseY;
+  waterFly.hoverAmount = 24;
+  waterFly.hoverSpeed = 3.2;
+  waterFly.challengeTime = 0;
+  waterFly.alive =
+    !waterFly.collected;
+
+  windFly.alive = false;
+
+  enemy.type = "caranguejo";
+  enemy.surfaceY = ground.y;
+  enemy.x = 820;
+  enemy.patrolMin = 700;
+  enemy.patrolMax = 900;
+  enemy.patrolSpeed = 62;
+  enemy.chaseSpeed = 112;
+  enemy.detectionRange = 260;
+  enemy.damage = 10;
+
+  resetMangueEnemies(0);
+
+  rebuildSolids();
+
+  enemy.y =
+    enemy.surfaceY -
+    enemy.height;
+
+  enemy.hp =
+    enemy.maxHp;
+
+  enemy.alive = true;
+  enemy.attackCooldownTimer = 0;
+  enemy.hurtTimer = 0;
+};
+
+const __mangueV1UpdateWaterFly =
+  updateWaterFly;
+
+updateWaterFly = function(dt) {
+  if (
+    currentRoom !== 0 ||
+    !waterFly.alive ||
+    typeof waterFly.baseX !== "number"
+  ) {
+    __mangueV1UpdateWaterFly(dt);
+    return;
+  }
+
+  if (
+    typeof waterFly.animTime !== "number"
+  ) {
+    waterFly.animTime = 0;
+  }
+
+  if (
+    typeof waterFly.challengeTime !== "number"
+  ) {
+    waterFly.challengeTime = 0;
+  }
+
+  waterFly.animTime += dt;
+  waterFly.hoverTime += dt;
+  waterFly.challengeTime += dt;
+
+  waterFly.x =
+    waterFly.baseX +
+    Math.sin(
+      waterFly.challengeTime *
+      1.65
+    ) * 62;
+
+  waterFly.y =
+    waterFly.baseY +
+    Math.sin(
+      waterFly.challengeTime *
+      3.1
+    ) * 24;
+};
+
+// Se cair no canal, volta ao último checkpoint.
+const __mangueV1Update =
+  update;
+
+update = function(dt) {
+  __mangueV1Update(dt);
+
+  if (
+    currentRoom === 0 &&
+    !mac.dead &&
+    mac.y >
+      WORLD_HEIGHT + 30
+  ) {
+    killMac();
+  }
+};
+
+// ============================================================
+// VISUAL V2
+// ============================================================
+
+function drawMangueV2GroundSegment(
+  segment
+) {
+  const gradient =
+    ctx.createLinearGradient(
+      0,
+      segment.y,
+      0,
+      WORLD_HEIGHT
+    );
+
+  gradient.addColorStop(
+    0,
+    "#62664c"
+  );
+
+  gradient.addColorStop(
+    1,
+    "#3d493b"
+  );
+
+  ctx.fillStyle =
+    gradient;
+
+  ctx.fillRect(
+    segment.x,
+    segment.y,
+    segment.width,
+    segment.height
+  );
+
+  ctx.fillStyle =
+    "#7f9159";
+
+  ctx.fillRect(
+    segment.x,
+    segment.y,
+    segment.width,
+    7
+  );
+
+  ctx.fillStyle =
+    "rgba(60,79,52,0.75)";
+
+  for (
+    let x =
+      segment.x + 8;
+    x <
+      segment.x +
+      segment.width;
+    x += 34
+  ) {
+    ctx.fillRect(
+      x,
+      segment.y - 3,
+      22,
+      4
+    );
+  }
+}
+
+function drawMangueV2Pit(
+  pit
+) {
+  const t =
+    performance.now() *
+    0.001;
+
+  ctx.fillStyle =
+    "#447f80";
+
+  ctx.fillRect(
+    pit.x,
+    ground.y,
+    pit.width,
+    WORLD_HEIGHT -
+      ground.y
+  );
+
+  ctx.strokeStyle =
+    "rgba(222,244,219,0.52)";
+
+  ctx.lineWidth = 2;
+
+  for (
+    let y =
+      ground.y + 10;
+    y <
+      WORLD_HEIGHT;
+    y += 24
+  ) {
+    const phase =
+      Math.sin(
+        t * 1.8 +
+        y * 0.03
+      ) * 10;
+
+    for (
+      let x =
+        pit.x + 8;
+      x <
+        pit.x +
+        pit.width - 20;
+      x += 58
+    ) {
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x + phase,
+        y
+      );
+
+      ctx.quadraticCurveTo(
+        x + 17 + phase,
+        y - 3,
+        x + 35 + phase,
+        y
+      );
+
+      ctx.stroke();
+    }
+  }
+
+  ctx.strokeStyle =
+    "#4d4b36";
+
+  ctx.lineWidth = 6;
+
+  for (
+    let i = 0;
+    i < 3;
+    i++
+  ) {
+    const x =
+      pit.x +
+      pit.width *
+      (
+        0.22 +
+        i * 0.27
+      );
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x,
+      ground.y + 60
+    );
+
+    ctx.lineTo(
+      x +
+      (
+        i % 2
+          ? 8
+          : -8
+      ),
+      ground.y + 15
+    );
+
+    ctx.stroke();
+  }
+}
+
+drawMangroveBackground = function() {
+  const sky =
+    ctx.createLinearGradient(
+      0,
+      0,
+      0,
+      HEIGHT
+    );
+
+  sky.addColorStop(
+    0,
+    "#8fc9df"
+  );
+
+  sky.addColorStop(
+    0.43,
+    "#dbe8d1"
+  );
+
+  sky.addColorStop(
+    0.77,
+    "#afc59a"
+  );
+
+  sky.addColorStop(
+    1,
+    "#809c76"
+  );
+
+  ctx.fillStyle = sky;
+
+  ctx.fillRect(
+    0,
+    0,
+    WIDTH,
+    HEIGHT
+  );
+
+  ctx.save();
+  ctx.globalAlpha = 0.23;
+  ctx.fillStyle = "#fff1b9";
+
+  ctx.beginPath();
+
+  ctx.arc(
+    WIDTH * 0.72,
+    104,
+    66,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+  ctx.restore();
+
+  // Morros de Mata Atlântica.
+  const far =
+    -(
+      (
+        camera.x *
+        0.06
+      ) %
+      640
+    );
+
+  ctx.fillStyle =
+    "rgba(76,111,81,0.25)";
+
+  for (
+    let i = -1;
+    i <
+      Math.ceil(
+        WIDTH / 420
+      ) + 2;
+    i++
+  ) {
+    const x =
+      far +
+      i * 420;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x,
+      HEIGHT * 0.60
+    );
+
+    ctx.quadraticCurveTo(
+      x + 95,
+      HEIGHT * 0.31,
+      x + 205,
+      HEIGHT * 0.56
+    );
+
+    ctx.quadraticCurveTo(
+      x + 310,
+      HEIGHT * 0.34,
+      x + 430,
+      HEIGHT * 0.60
+    );
+
+    ctx.lineTo(
+      x + 430,
+      HEIGHT * 0.70
+    );
+
+    ctx.lineTo(
+      x,
+      HEIGHT * 0.70
+    );
+
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Ruína colonial distante.
+  ctx.save();
+
+  ctx.translate(
+    WIDTH * 0.80 -
+      camera.x * 0.035,
+    0
+  );
+
+  ctx.fillStyle =
+    "rgba(89,94,78,0.31)";
+
+  ctx.fillRect(
+    -42,
+    220,
+    115,
+    105
+  );
+
+  ctx.fillRect(
+    -62,
+    177,
+    30,
+    148
+  );
+
+  ctx.fillRect(
+    82,
+    177,
+    30,
+    148
+  );
+
+  ctx.fillRect(
+    -56,
+    165,
+    18,
+    16
+  );
+
+  ctx.fillRect(
+    88,
+    165,
+    18,
+    16
+  );
+
+  ctx.fillStyle =
+    "rgba(202,216,188,0.28)";
+
+  ctx.fillRect(
+    -18,
+    245,
+    22,
+    80
+  );
+
+  ctx.restore();
+
+  // Mangue intermediário.
+  const mid =
+    -(
+      (
+        camera.x *
+        0.16
+      ) %
+      360
+    );
+
+  ctx.strokeStyle =
+    "rgba(48,78,59,0.43)";
+
+  ctx.lineCap =
+    "round";
+
+  for (
+    let i = -1;
+    i <
+      Math.ceil(
+        WIDTH / 190
+      ) + 2;
+    i++
+  ) {
+    const x =
+      mid +
+      i * 190 +
+      50;
+
+    const base =
+      HEIGHT * 0.70;
+
+    const top =
+      HEIGHT *
+      (
+        0.31 +
+        (i % 3) *
+        0.03
+      );
+
+    ctx.lineWidth = 7;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x,
+      base
+    );
+
+    ctx.quadraticCurveTo(
+      x - 18,
+      (
+        base +
+        top
+      ) / 2,
+      x,
+      top
+    );
+
+    ctx.stroke();
+
+    ctx.lineWidth = 4;
+
+    for (
+      let a = -2;
+      a <= 2;
+      a++
+    ) {
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x,
+        top + 8
+      );
+
+      ctx.quadraticCurveTo(
+        x + a * 18,
+        top - 16,
+        x + a * 36,
+        top + 10
+      );
+
+      ctx.stroke();
+    }
+  }
+
+  const waterY =
+    HEIGHT * 0.68;
+
+  ctx.fillStyle =
+    "rgba(69,157,159,0.34)";
+
+  ctx.fillRect(
+    0,
+    waterY,
+    WIDTH,
+    HEIGHT -
+      waterY
+  );
+
+  ctx.strokeStyle =
+    "rgba(235,249,223,0.34)";
+
+  ctx.lineWidth = 2;
+
+  for (
+    let y =
+      waterY + 15;
+    y <
+      HEIGHT;
+    y += 25
+  ) {
+    const offset =
+      (
+        camera.x *
+        0.14 +
+        y * 0.9
+      ) %
+      105;
+
+    for (
+      let x = -110;
+      x <
+        WIDTH + 110;
+      x += 125
+    ) {
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x - offset,
+        y
+      );
+
+      ctx.quadraticCurveTo(
+        x + 24 - offset,
+        y - 3,
+        x + 62 - offset,
+        y
+      );
+
+      ctx.stroke();
+    }
+  }
+
+  // Duas garças ao longe.
+  const birdX =
+    WIDTH * 0.24 -
+    (
+      camera.x *
+      0.04
+    ) %
+    180;
+
+  ctx.strokeStyle =
+    "rgba(247,245,221,0.58)";
+
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    birdX,
+    245,
+    12,
+    Math.PI * 1.10,
+    Math.PI * 1.78
+  );
+
+  ctx.stroke();
+
+  ctx.beginPath();
+
+  ctx.arc(
+    birdX + 20,
+    245,
+    12,
+    Math.PI * 1.22,
+    Math.PI * 1.90
+  );
+
+  ctx.stroke();
+};
+
+drawStoneBlocks = function(
+  rect,
+  wall = false
+) {
+  const side =
+    wall
+      ? "#5f604c"
+      : "#6e7057";
+
+  const top =
+    wall
+      ? "#85836a"
+      : "#949077";
+
+  ctx.fillStyle =
+    side;
+
+  ctx.fillRect(
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height
+  );
+
+  ctx.fillStyle =
+    top;
+
+  ctx.fillRect(
+    rect.x,
+    rect.y,
+    rect.width,
+    Math.min(
+      9,
+      rect.height
+    )
+  );
+
+  ctx.strokeStyle =
+    "rgba(50,52,40,0.35)";
+
+  ctx.lineWidth = 1;
+
+  const blockH = 17;
+  const blockW = 37;
+
+  for (
+    let yy =
+      rect.y + 9;
+    yy <
+      rect.y +
+      rect.height;
+    yy += blockH
+  ) {
+    const row =
+      Math.floor(
+        (
+          yy -
+          rect.y
+        ) /
+        blockH
+      );
+
+    for (
+      let xx =
+        rect.x +
+        (
+          row % 2
+            ? -18
+            : 0
+        );
+      xx <
+        rect.x +
+        rect.width;
+      xx += blockW
+    ) {
+      ctx.strokeRect(
+        xx,
+        yy,
+        blockW,
+        blockH
+      );
+    }
+  }
+
+  ctx.strokeStyle =
+    "rgba(45,45,36,0.30)";
+
+  ctx.lineWidth = 1.5;
+
+  const crackX =
+    rect.x +
+    rect.width * 0.37;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    crackX,
+    rect.y + 11
+  );
+
+  ctx.lineTo(
+    crackX - 6,
+    rect.y + 24
+  );
+
+  ctx.lineTo(
+    crackX + 4,
+    rect.y + 36
+  );
+
+  ctx.stroke();
+
+  ctx.fillStyle =
+    "#67864c";
+
+  for (
+    let x =
+      rect.x + 5;
+    x <
+      rect.x +
+      rect.width - 4;
+    x += 19
+  ) {
+    ctx.fillRect(
+      x,
+      rect.y - 3,
+      14,
+      5
+    );
+
+    if (
+      (
+        Math.floor(
+          x / 19
+        ) %
+        3
+      ) === 0
+    ) {
+      ctx.fillRect(
+        x + 4,
+        rect.y + 1,
+        3,
+        7
+      );
+    }
+  }
+
+  if (
+    wall &&
+    rect.height > 130
+  ) {
+    ctx.strokeStyle =
+      "rgba(48,126,128,0.48)";
+
+    ctx.lineWidth = 2;
+
+    const cy =
+      rect.y + 42;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      rect.x + 10,
+      cy
+    );
+
+    ctx.lineTo(
+      rect.x +
+      rect.width / 2,
+      cy - 9
+    );
+
+    ctx.lineTo(
+      rect.x +
+      rect.width - 10,
+      cy
+    );
+
+    ctx.lineTo(
+      rect.x +
+      rect.width / 2,
+      cy + 9
+    );
+
+    ctx.closePath();
+    ctx.stroke();
+  }
+};
+
+function drawMangueV2Anchor(
+  anchor,
+  reachable
+) {
+  ctx.save();
+
+  ctx.strokeStyle =
+    anchor.kind === "vine"
+      ? "#53633d"
+      : "#554832";
+
+  ctx.lineCap = "round";
+
+  ctx.lineWidth =
+    anchor.kind === "vine"
+      ? 6
+      : 10;
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    anchor.x -
+      (
+        anchor.kind === "vine"
+          ? 0
+          : 52
+      ),
+    anchor.y - 62
+  );
+
+  ctx.quadraticCurveTo(
+    anchor.x - 8,
+    anchor.y - 28,
+    anchor.x,
+    anchor.y
+  );
+
+  ctx.stroke();
+
+  ctx.fillStyle =
+    reachable
+      ? "#cbdc88"
+      : "#8fa064";
+
+  ctx.beginPath();
+
+  ctx.ellipse(
+    anchor.x,
+    anchor.y,
+    11,
+    8,
+    -0.2,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+  ctx.strokeStyle =
+    "rgba(237,245,194,0.65)";
+
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.strokeStyle =
+    "#668b51";
+
+  ctx.lineWidth = 3;
+
+  for (
+    let i = -2;
+    i <= 2;
+    i++
+  ) {
+    ctx.beginPath();
+
+    ctx.moveTo(
+      anchor.x,
+      anchor.y - 7
+    );
+
+    ctx.quadraticCurveTo(
+      anchor.x +
+        i * 4,
+      anchor.y - 17,
+      anchor.x +
+        i * 9,
+      anchor.y - 23
+    );
+
+    ctx.stroke();
+  }
+
+  // Só o primeiro ponto ensina o botão; depois o cenário fala sozinho.
+  if (
+    anchor.id === "raiz_ponte_1" &&
+    mac.x < 820
+  ) {
+    ctx.fillStyle =
+      "rgba(35,49,36,0.72)";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      anchor.x - 18,
+      anchor.y - 40,
+      13,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.fillStyle =
+      "#f1f0cf";
+
+    ctx.font =
+      "bold 14px sans-serif";
+
+    ctx.textAlign =
+      "center";
+
+    ctx.textBaseline =
+      "middle";
+
+    ctx.fillText(
+      "C",
+      anchor.x - 18,
+      anchor.y - 40
+    );
+  }
+
+  ctx.restore();
+}
+
+drawGrapplePoint = function() {
+  if (currentRoom !== 0) {
+    const origin =
+      getTongueOrigin();
+
+    const reachable =
+      distance(
+        origin.x,
+        origin.y,
+        grapplePoint.x,
+        grapplePoint.y
+      ) <=
+        grapplePoint.grabRange &&
+      tongueLineClearToPoint(
+        grapplePoint.x,
+        grapplePoint.y
+      );
+
+    ctx.save();
+
+    ctx.fillStyle =
+      reachable
+        ? "#5eead4"
+        : "#38bdf8";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      grapplePoint.x,
+      grapplePoint.y,
+      grapplePoint.radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.strokeStyle =
+      "#dffcff";
+
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.restore();
+    return;
+  }
+
+  const origin =
+    getTongueOrigin();
+
+  for (
+    const anchor of
+    MANGUE_V2_ANCHORS
+  ) {
+    const d =
+      distance(
+        origin.x,
+        origin.y,
+        anchor.x,
+        anchor.y
+      );
+
+    const direction =
+      anchor.x >= origin.x
+        ? 1
+        : -1;
+
+    const reachable =
+      !grapple.active &&
+      d <= anchor.grabRange &&
+      (
+        direction === mac.facing ||
+        d <= 185
+      ) &&
+      tongueLineClearToPoint(
+        anchor.x,
+        anchor.y
+      );
+
+    drawMangueV2Anchor(
+      anchor,
+      reachable
+    );
+  }
+};
+
+drawMangroveWorldDecor = function() {
+  if (currentRoom !== 0) {
+    return;
+  }
+
+  ctx.save();
+
+  ctx.strokeStyle =
+    "#514733";
+
+  ctx.lineCap = "round";
+
+  const rootZones = [
+    90,
+    1330,
+    2540,
+    3830,
+    4720
+  ];
+
+  for (
+    const rootX of
+    rootZones
+  ) {
+    ctx.lineWidth = 20;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      rootX,
+      ground.y + 18
+    );
+
+    ctx.bezierCurveTo(
+      rootX - 68,
+      ground.y - 72,
+      rootX + 42,
+      ground.y - 178,
+      rootX + 18,
+      ground.y - 300
+    );
+
+    ctx.stroke();
+
+    ctx.lineWidth = 8;
+
+    for (
+      let i = 0;
+      i < 3;
+      i++
+    ) {
+      ctx.beginPath();
+
+      ctx.moveTo(
+        rootX,
+        ground.y -
+          18 -
+          i * 20
+      );
+
+      ctx.quadraticCurveTo(
+        rootX +
+          (
+            i - 1
+          ) * 58,
+        ground.y -
+          48 -
+          i * 12,
+        rootX +
+          (
+            i - 1
+          ) * 100,
+        ground.y
+      );
+
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+
+  // Arcos dão continuidade arquitetônica às plataformas.
+  const arches = [
+    300,
+    1450,
+    2550,
+    3880,
+    4470
+  ];
+
+  for (
+    const x of arches
+  ) {
+    ctx.fillStyle =
+      "rgba(92,93,72,0.72)";
+
+    ctx.fillRect(
+      x,
+      548,
+      24,
+      212
+    );
+
+    ctx.fillRect(
+      x + 112,
+      565,
+      24,
+      195
+    );
+
+    ctx.strokeStyle =
+      "rgba(117,116,88,0.82)";
+
+    ctx.lineWidth = 14;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      x + 68,
+      590,
+      56,
+      Math.PI,
+      Math.PI * 2
+    );
+
+    ctx.stroke();
+  }
+
+  const plants = [
+    [405, 682],
+    [710, 668],
+    [1535, 612],
+    [1775, 532],
+    [2620, 688],
+    [2950, 518],
+    [3260, 343],
+    [3910, 688],
+    [4290, 548],
+    [4530, 618]
+  ];
+
+  for (
+    const point of plants
+  ) {
+    const x = point[0];
+    const y = point[1];
+
+    ctx.save();
+
+    ctx.translate(
+      x,
+      y
+    );
+
+    for (
+      let i = -3;
+      i <= 3;
+      i++
+    ) {
+      ctx.strokeStyle =
+        i === 0
+          ? "#b45543"
+          : "#4d7b46";
+
+      ctx.lineWidth = 4;
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        0,
+        0
+      );
+
+      ctx.quadraticCurveTo(
+        i * 5,
+        -15,
+        i * 10,
+        -28 -
+          Math.abs(i) * 2
+      );
+
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // Totem anfíbio discreto marca o santuário da mosca azul.
+  ctx.save();
+
+  ctx.translate(
+    3295,
+    343
+  );
+
+  ctx.fillStyle =
+    "#6b6d56";
+
+  ctx.fillRect(
+    -16,
+    -46,
+    32,
+    46
+  );
+
+  ctx.beginPath();
+
+  ctx.arc(
+    0,
+    -48,
+    22,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+  ctx.fillStyle =
+    "#b9b07b";
+
+  ctx.beginPath();
+
+  ctx.arc(
+    -8,
+    -53,
+    3,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.arc(
+    8,
+    -53,
+    3,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fill();
+
+  ctx.restore();
+};
+
+drawWorldGeometry = function() {
+  if (currentRoom === 0) {
+    for (
+      const segment of
+      MANGUE_V2_GROUND_SEGMENTS
+    ) {
+      drawMangueV2GroundSegment(
+        segment
+      );
+    }
+
+    for (
+      const pit of
+      MANGUE_V2_PITS
+    ) {
+      drawMangueV2Pit(
+        pit
+      );
+    }
+  } else {
+    ctx.fillStyle =
+      "#5c5c5c";
+
+    ctx.fillRect(
+      ground.x,
+      ground.y,
+      ground.width,
+      ground.height
+    );
+  }
+
+  for (
+    const platform of
+    platforms
+  ) {
+    if (currentRoom === 0) {
+      drawStoneBlocks(
+        platform,
+        false
+      );
+    } else {
+      ctx.fillStyle =
+        "#777777";
+
+      ctx.fillRect(
+        platform.x,
+        platform.y,
+        platform.width,
+        platform.height
+      );
+    }
+  }
+
+  for (
+    const wall of walls
+  ) {
+    if (currentRoom === 0) {
+      drawStoneBlocks(
+        wall,
+        true
+      );
+    } else {
+      ctx.fillStyle =
+        "#595959";
+
+      ctx.fillRect(
+        wall.x,
+        wall.y,
+        wall.width,
+        wall.height
+      );
+    }
+  }
+
+  if (DEBUG_HITBOX) {
+    ctx.save();
+
+    ctx.strokeStyle =
+      "rgba(255,255,255,0.28)";
+
+    for (
+      const solid of
+      solids
+    ) {
+      ctx.strokeRect(
+        solid.x,
+        solid.y,
+        solid.width,
+        solid.height
+      );
+    }
+
+    ctx.restore();
+  }
+};
+
+// Reaplica a sala com a geometria V2 imediatamente.
+applyScenarioRoom(0);
