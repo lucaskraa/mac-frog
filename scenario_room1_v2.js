@@ -593,3 +593,15 @@ draw = function() {
   room1v2Foreground();
   drawHUD();
 };
+
+
+let room1v2HadWaterPower = mac.waterPower;
+const __room1v2Update = update;
+update = function(dt) {
+  __room1v2Update(dt);
+
+  if (currentRoom === 0 && room1v2HadWaterPower !== mac.waterPower) {
+    room1v2HadWaterPower = mac.waterPower;
+    rebuildSolids();
+  }
+};
