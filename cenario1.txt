@@ -672,11 +672,11 @@ MANGUE_ROOM_0_PLATFORMS.splice(
 MANGUE_ROOM_0_WALLS.splice(
   0,
   MANGUE_ROOM_0_WALLS.length,
-  { x: 1210, y: 585, width: 50, height: 175 },
-  { x: 2025, y: 610, width: 48, height: 150 },
-  { x: 2420, y: 590, width: 50, height: 170 },
-  { x: 3655, y: 580, width: 48, height: 180 },
-  { x: 4670, y: 620, width: 44, height: 140 }
+  { x: 1360, y: 600, width: 50, height: 160 },
+  { x: 1815, y: 610, width: 48, height: 150 },
+  { x: 2580, y: 590, width: 50, height: 170 },
+  { x: 3890, y: 580, width: 48, height: 180 },
+  { x: 4580, y: 620, width: 44, height: 140 }
 );
 
 const MANGUE_V2_GROUND_SEGMENTS = [
