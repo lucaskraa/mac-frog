@@ -1,11 +1,9 @@
-// ============================================================
-// ROOM 1 V2 — MANGUE DARK-FANTASY / METROIDVANIA PASS
-// Aplicado por cima da base estável. Mantém física, Mac e poderes.
-// Foco: layout, profundidade, iluminação, água e arquitetura.
-// ============================================================
+// ROOM 1 V4 — performance-first metroidvania mangrove
+// Fixed macro layout + hand-authored traversal chunks.
+// Static scenery is cached and rendered from local atlases.
 
-roomNames[0] = "Área 1 - Mangue das Ruínas";
-checkpoints[0].x = 2460;
+roomNames[0] = "Área 1 - Manguezal das Ruínas";
+checkpoints[0].x = 2320;
 checkpoints[0].y = 690;
 
 grapple.minLength = 96;
@@ -13,119 +11,227 @@ grapple.maxLength = 315;
 grapple.swingAcceleration = 8.4;
 grapple.maxAngularSpeed = 4.8;
 
-const ROOM1_V2_GROUND = [
-  { x: 0,    y: 760, width: 760,  height: WORLD_HEIGHT - 760 },
-  { x: 1100, y: 760, width: 880,  height: WORLD_HEIGHT - 760 },
-  { x: 2320, y: 760, width: 940,  height: WORLD_HEIGHT - 760 },
-  { x: 3590, y: 760, width: 1210, height: WORLD_HEIGHT - 760 }
-];
+const ROOM1V4_TILE_IMG = new Image();
+const ROOM1V4_LAND_IMG = new Image();
+ROOM1V4_TILE_IMG.decoding = "async";
+ROOM1V4_LAND_IMG.decoding = "async";
 
-const ROOM1_V2_PITS = [
-  { x: 760,  width: 340 },
-  { x: 1980, width: 340 },
-  { x: 3260, width: 330 }
-];
+async function room1v4LoadLocalAtlas(path, image) {
+  try {
+    const response = await fetch(path, { cache: "force-cache" });
+    if (!response.ok) return;
+    const b64 = (await response.text()).trim();
+    image.src = "data:image/png;base64," + b64;
+  } catch (error) {
+    console.warn("Room 1 atlas failed:", path, error);
+  }
+}
 
-const ROOM1_V2_PLATFORMS = [
-  { x: 190,  y: 700, width: 220, height: 22 },
-  { x: 480,  y: 632, width: 190, height: 22 },
-  { x: 680,  y: 690, width: 70,  height: 22 },
+room1v4LoadLocalAtlas("./assets/room1_tiles.b64", ROOM1V4_TILE_IMG);
+room1v4LoadLocalAtlas("./assets/room1_landmarks.b64", ROOM1V4_LAND_IMG);
 
-  { x: 1120, y: 700, width: 190, height: 22 },
-  { x: 1325, y: 625, width: 165, height: 22 },
-  { x: 1515, y: 545, width: 160, height: 22 },
-  { x: 1690, y: 465, width: 165, height: 22 },
-  { x: 1810, y: 615, width: 145, height: 22 },
+const ROOM1V4 = {
+  floors: [
+    { x:0, y:760, width:720, height:WORLD_HEIGHT-760 },
+    { x:1080, y:760, width:820, height:WORLD_HEIGHT-760 },
+    { x:2250, y:760, width:930, height:WORLD_HEIGHT-760 },
+    { x:3510, y:760, width:1290, height:WORLD_HEIGHT-760 }
+  ],
+  pits: [
+    { x:720, width:360 },
+    { x:1900, width:350 },
+    { x:3180, width:330 }
+  ],
+  platforms: [
+    {x:170,y:700,width:220,height:24,style:"moss"},
+    {x:455,y:630,width:190,height:24,style:"stone"},
+    {x:650,y:690,width:60,height:24,style:"wood"},
 
-  { x: 2350, y: 700, width: 220, height: 22 },
-  { x: 2570, y: 625, width: 180, height: 22 },
-  { x: 2760, y: 540, width: 175, height: 22 },
-  { x: 2945, y: 450, width: 165, height: 22 },
+    {x:1110,y:700,width:180,height:24,style:"moss"},
+    {x:1300,y:625,width:165,height:24,style:"stone"},
+    {x:1485,y:545,width:160,height:24,style:"stone"},
+    {x:1665,y:465,width:175,height:24,style:"azulejo"},
+    {x:1785,y:615,width:100,height:24,style:"wood"},
 
-  { x: 2640, y: 390, width: 130, height: 20 },
-  { x: 2830, y: 315, width: 130, height: 20 },
-  { x: 3030, y: 250, width: 180, height: 22 },
+    {x:2280,y:700,width:210,height:24,style:"moss"},
+    {x:2500,y:625,width:175,height:24,style:"stone"},
+    {x:2680,y:540,width:165,height:24,style:"azulejo"},
+    {x:2860,y:450,width:160,height:24,style:"wood"},
+    {x:3020,y:355,width:155,height:24,style:"shrine"},
 
-  { x: 3620, y: 700, width: 220, height: 22 },
-  { x: 3870, y: 625, width: 190, height: 22 },
-  { x: 4090, y: 545, width: 185, height: 22 },
-  { x: 4310, y: 465, width: 175, height: 22 },
-  { x: 4515, y: 620, width: 200, height: 22 }
-];
+    {x:2420,y:420,width:120,height:22,style:"broken"},
+    {x:2600,y:340,width:120,height:22,style:"root"},
+    {x:2780,y:270,width:135,height:22,style:"root"},
+    {x:2970,y:205,width:190,height:22,style:"shrine"},
 
-const ROOM1_V2_WALLS = [
-  { x: 1215, y: 585, width: 50, height: 175 },
-  { x: 1575, y: 355, width: 52, height: 405 },
-  { x: 2400, y: 590, width: 52, height: 170 },
-  { x: 3140, y: 300, width: 50, height: 460 },
-  { x: 3950, y: 590, width: 50, height: 170 },
-  { x: 4590, y: 620, width: 46, height: 140 }
-];
+    {x:3540,y:700,width:220,height:24,style:"moss"},
+    {x:3780,y:625,width:180,height:24,style:"stone"},
+    {x:3990,y:545,width:180,height:24,style:"azulejo"},
+    {x:4200,y:465,width:180,height:24,style:"stone"},
+    {x:4420,y:620,width:210,height:24,style:"wood"}
+  ],
+  walls: [
+    {x:1210,y:585,width:48,height:175},
+    {x:1570,y:355,width:50,height:405},
+    {x:2370,y:590,width:50,height:170},
+    {x:3135,y:285,width:48,height:475},
+    {x:3910,y:585,width:50,height:175},
+    {x:4580,y:620,width:46,height:140}
+  ],
+  anchors: [
+    {id:"a1",x:900,y:470,radius:12,grabRange:330,kind:"root"},
+    {id:"a2",x:1705,y:330,radius:12,grabRange:300,kind:"vine"},
+    {id:"a3",x:2080,y:445,radius:12,grabRange:340,kind:"root"},
+    {id:"a4",x:2550,y:370,radius:12,grabRange:305,kind:"vine"},
+    {id:"a5",x:2790,y:275,radius:12,grabRange:295,kind:"vine"},
+    {id:"a6",x:3340,y:455,radius:12,grabRange:340,kind:"root"},
+    {id:"a7",x:4090,y:365,radius:12,grabRange:300,kind:"vine"}
+  ],
+  forwardGate:{x:3295,y:500,width:34,height:260},
+  shortcutGate:{x:1040,y:650,width:34,height:110}
+};
 
-MANGUE_ROOM_0_PLATFORMS.splice(0, MANGUE_ROOM_0_PLATFORMS.length, ...ROOM1_V2_PLATFORMS);
-MANGUE_ROOM_0_WALLS.splice(0, MANGUE_ROOM_0_WALLS.length, ...ROOM1_V2_WALLS);
-MANGUE_V2_GROUND_SEGMENTS.splice(0, MANGUE_V2_GROUND_SEGMENTS.length, ...ROOM1_V2_GROUND);
-MANGUE_V2_PITS.splice(0, MANGUE_V2_PITS.length, ...ROOM1_V2_PITS);
+function room1v4Clone(items) {
+  return items.map(o => ({ x:o.x, y:o.y, width:o.width, height:o.height }));
+}
+
+function room1v4Style(rect) {
+  const p = ROOM1V4.platforms.find(o =>
+    o.x === rect.x && o.y === rect.y && o.width === rect.width
+  );
+  return p?.style || "stone";
+}
+
+MANGUE_ROOM_0_PLATFORMS.splice(
+  0,
+  MANGUE_ROOM_0_PLATFORMS.length,
+  ...room1v4Clone(ROOM1V4.platforms)
+);
+
+MANGUE_ROOM_0_WALLS.splice(
+  0,
+  MANGUE_ROOM_0_WALLS.length,
+  ...room1v4Clone(ROOM1V4.walls)
+);
+
+MANGUE_V2_GROUND_SEGMENTS.splice(
+  0,
+  MANGUE_V2_GROUND_SEGMENTS.length,
+  ...ROOM1V4.floors
+);
+
+MANGUE_V2_PITS.splice(
+  0,
+  MANGUE_V2_PITS.length,
+  ...ROOM1V4.pits
+);
 
 MANGUE_V2_ANCHORS.splice(
   0,
   MANGUE_V2_ANCHORS.length,
-  { id: "r1_root_01", x: 920,  y: 475, radius: 12, grabRange: 325, kind: "root" },
-  { id: "r1_vine_01", x: 1715, y: 330, radius: 12, grabRange: 300, kind: "vine" },
-  { id: "r1_root_02", x: 2150, y: 450, radius: 12, grabRange: 340, kind: "root" },
-  { id: "r1_vine_02", x: 2670, y: 360, radius: 12, grabRange: 305, kind: "vine" },
-  { id: "r1_vine_03", x: 2910, y: 265, radius: 12, grabRange: 295, kind: "vine" },
-  { id: "r1_root_03", x: 3430, y: 455, radius: 12, grabRange: 340, kind: "root" },
-  { id: "r1_chain_01", x: 4190, y: 365, radius: 12, grabRange: 300, kind: "vine" }
+  ...ROOM1V4.anchors
 );
 
-const ROOM1_V2_WATER_GATE = { x: 3500, y: 520, width: 34, height: 240 };
+const __room1v4RebuildSolids = rebuildSolids;
 
-const __room1v2RebuildSolids = rebuildSolids;
 rebuildSolids = function() {
-  __room1v2RebuildSolids();
-  if (currentRoom === 0 && !mac.waterPower) {
-    solids.push(ROOM1_V2_WATER_GATE);
+  solids.length = 0;
+
+  if (currentRoom === 0) {
+    solids.push(...ROOM1V4.floors, ...platforms, ...walls);
+
+    if (!mac.waterPower) {
+      solids.push(ROOM1V4.forwardGate, ROOM1V4.shortcutGate);
+    }
+
+    return;
   }
+
+  __room1v4RebuildSolids();
 };
 
-const __room1v2Apply = applyScenarioRoom;
+let room1v4StaticDirty = true;
+
+function room1v4MarkStaticDirty() {
+  room1v4StaticDirty = true;
+}
+
+const __room1v4Apply = applyScenarioRoom;
+
 applyScenarioRoom = function(index) {
-  __room1v2Apply(index);
+  __room1v4Apply(index);
+
   if (index !== 0) return;
 
   setRoomGeometry(MANGUE_ROOM_0_PLATFORMS, MANGUE_ROOM_0_WALLS);
 
-  grapplePoint.x = MANGUE_V2_ANCHORS[0].x;
-  grapplePoint.y = MANGUE_V2_ANCHORS[0].y;
-  grapplePoint.grabRange = MANGUE_V2_ANCHORS[0].grabRange;
+  grapplePoint.x = ROOM1V4.anchors[0].x;
+  grapplePoint.y = ROOM1V4.anchors[0].y;
+  grapplePoint.grabRange = ROOM1V4.anchors[0].grabRange;
 
-  waterFly.baseX = 3105;
+  waterFly.baseX = 3070;
   waterFly.x = waterFly.baseX;
-  waterFly.baseY = 205;
+  waterFly.baseY = 155;
   waterFly.y = waterFly.baseY;
   waterFly.challengeTime = 0;
   waterFly.alive = !waterFly.collected;
 
+  windFly.alive = false;
+
   enemy.type = "caranguejo";
   enemy.surfaceY = ground.y;
-  enemy.x = 560;
-  enemy.patrolMin = 470;
-  enemy.patrolMax = 710;
+  enemy.x = 540;
+  enemy.patrolMin = 450;
+  enemy.patrolMax = 690;
   enemy.patrolSpeed = 60;
   enemy.chaseSpeed = 112;
   enemy.detectionRange = 255;
   enemy.damage = 10;
 
   rebuildSolids();
+  room1v4MarkStaticDirty();
 };
 
 applyScenarioRoom(0);
 
-const __room1v2WaterFly = updateWaterFly;
+mangueEnemies.splice(
+  0,
+  7,
+  makeMangueEnemy(0, "caranguejo", 520, 450, 690),
+  Object.assign(
+    makeMangueEnemy(0, "cururu", 1320, 1290, 1470, { detectionRange:220 }),
+    { surfaceY:625 }
+  ),
+  Object.assign(
+    makeMangueEnemy(0, "caranguejo", 1810, 1775, 1880),
+    { surfaceY:615 }
+  ),
+  makeMangueEnemy(0, "caranguejo", 2390, 2280, 2490),
+  Object.assign(
+    makeMangueEnemy(0, "cururu", 2710, 2680, 2840, { detectionRange:210 }),
+    { surfaceY:540 }
+  ),
+  Object.assign(
+    makeMangueEnemy(0, "caranguejo", 3830, 3780, 3960),
+    { surfaceY:625 }
+  ),
+  Object.assign(
+    makeMangueEnemy(0, "cururu", 4230, 4200, 4370, { detectionRange:215 }),
+    { surfaceY:465 }
+  )
+);
+
+resetMangueEnemies(0);
+
+const __room1v4WaterFly = updateWaterFly;
+
 updateWaterFly = function(dt) {
-  if (currentRoom !== 0 || !waterFly.alive || typeof waterFly.baseX !== "number") {
-    __room1v2WaterFly(dt);
+  if (
+    currentRoom !== 0 ||
+    !waterFly.alive ||
+    typeof waterFly.baseX !== "number"
+  ) {
+    __room1v4WaterFly(dt);
     return;
   }
 
@@ -133,433 +239,553 @@ updateWaterFly = function(dt) {
   waterFly.challengeTime = (waterFly.challengeTime || 0) + dt;
 
   const t = waterFly.challengeTime;
-  waterFly.x = waterFly.baseX + Math.sin(t * 1.65) * 72;
-  waterFly.y = waterFly.baseY + Math.sin(t * 3.2) * 22 + Math.cos(t * 1.1) * 8;
+
+  waterFly.x =
+    waterFly.baseX +
+    Math.sin(t * 1.55) * 66;
+
+  waterFly.y =
+    waterFly.baseY +
+    Math.sin(t * 3.0) * 20 +
+    Math.cos(t * 1.1) * 7;
 };
 
-function room1v2Stone(rect, wall = false) {
-  const top = wall ? "#48616a" : "#58727b";
-  const side = wall ? "#20343b" : "#29434b";
-  const dark = wall ? "#14252b" : "#1b3036";
+let room1v4LastWaterPower = mac.waterPower;
 
-  const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.height);
-  g.addColorStop(0, top);
-  g.addColorStop(0.18, side);
-  g.addColorStop(1, dark);
-  ctx.fillStyle = g;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+const __room1v4Update = update;
 
-  const bw = 34;
-  const bh = 17;
-  for (let yy = rect.y + 7; yy < rect.y + rect.height; yy += bh) {
-    const row = Math.floor((yy - rect.y) / bh);
-    for (let xx = rect.x + (row % 2 ? -17 : 0); xx < rect.x + rect.width; xx += bw) {
-      ctx.strokeStyle = "rgba(7,18,22,.42)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(xx, yy, bw, bh);
-      ctx.fillStyle = "rgba(103,139,146,.07)";
-      ctx.fillRect(xx + 2, yy + 2, bw - 4, 2);
-    }
+update = function(dt) {
+  __room1v4Update(dt);
+
+  if (
+    currentRoom === 0 &&
+    room1v4LastWaterPower !== mac.waterPower
+  ) {
+    room1v4LastWaterPower = mac.waterPower;
+    rebuildSolids();
+    room1v4MarkStaticDirty();
+  }
+};
+
+// Static world cache: expensive tile work happens only when geometry changes.
+const ROOM1V4_STATIC = document.createElement("canvas");
+ROOM1V4_STATIC.width = WORLD_WIDTH;
+ROOM1V4_STATIC.height = WORLD_HEIGHT;
+
+const ROOM1V4_SCTX = ROOM1V4_STATIC.getContext("2d");
+ROOM1V4_SCTX.imageSmoothingEnabled = false;
+
+// Cached parallax strip.
+const ROOM1V4_BG = document.createElement("canvas");
+ROOM1V4_BG.width = 2200;
+ROOM1V4_BG.height = HEIGHT;
+
+const ROOM1V4_BGCTX = ROOM1V4_BG.getContext("2d");
+ROOM1V4_BGCTX.imageSmoothingEnabled = false;
+
+let room1v4BgReady = false;
+
+ROOM1V4_TILE_IMG.onload = room1v4MarkStaticDirty;
+ROOM1V4_LAND_IMG.onload = room1v4MarkStaticDirty;
+
+function room1v4Tile(ctx2, tileX, tileY, dx, dy, dw = 64, dh = 64) {
+  if (!(ROOM1V4_TILE_IMG.complete && ROOM1V4_TILE_IMG.naturalWidth)) {
+    return false;
   }
 
-  ctx.fillStyle = "#55784d";
-  for (let x = rect.x + 5; x < rect.x + rect.width - 4; x += 19) {
-    const h = 3 + ((x * 7 + rect.y) % 7);
-    ctx.fillRect(x, rect.y - 3, 13, 5);
-    if (h > 6) ctx.fillRect(x + 4, rect.y + 2, 3, h);
-  }
+  ctx2.drawImage(
+    ROOM1V4_TILE_IMG,
+    tileX * 64,
+    tileY * 64,
+    64,
+    64,
+    Math.round(dx),
+    Math.round(dy),
+    Math.round(dw),
+    Math.round(dh)
+  );
 
-  if (wall && rect.height > 150) {
-    ctx.strokeStyle = "rgba(58,128,140,.5)";
-    ctx.lineWidth = 2;
-    for (let y = rect.y + 44; y < rect.y + rect.height - 20; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(rect.x + 9, y);
-      ctx.lineTo(rect.x + rect.width / 2, y - 8);
-      ctx.lineTo(rect.x + rect.width - 9, y);
-      ctx.lineTo(rect.x + rect.width / 2, y + 8);
-      ctx.closePath();
-      ctx.stroke();
+  return true;
+}
+
+function room1v4DrawPlatformTo(ctx2, rect, style) {
+  const tileMap = {
+    stone:[0,0],
+    moss:[0,1],
+    azulejo:[2,0],
+    wood:[3,0],
+    broken:[1,0],
+    root:[0,1],
+    shrine:[2,2]
+  };
+
+  const [tx, ty] = tileMap[style] || tileMap.stone;
+
+  for (let x = rect.x; x < rect.x + rect.width; x += 64) {
+    const w = Math.min(64, rect.x + rect.width - x);
+
+    if (!room1v4Tile(ctx2, tx, ty, x, rect.y - 40, 64, 64)) {
+      ctx2.fillStyle = "#34434a";
+      ctx2.fillRect(x, rect.y, w, rect.height);
     }
   }
 }
 
-function room1v2Wood(rect) {
-  ctx.fillStyle = "#261b18";
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-  ctx.fillStyle = "#6a4934";
-
-  for (let x = rect.x + 3; x < rect.x + rect.width; x += 34) {
-    ctx.fillRect(x, rect.y + 2, 29, rect.height - 4);
-    ctx.fillStyle = "#8b6546";
-    ctx.fillRect(x, rect.y + 2, 29, 3);
-    ctx.fillStyle = "#6a4934";
-  }
-
-  ctx.strokeStyle = "#17100f";
-  ctx.lineWidth = 2;
-  for (let x = rect.x + 30; x < rect.x + rect.width; x += 68) {
-    ctx.beginPath();
-    ctx.moveTo(x, rect.y);
-    ctx.lineTo(x - 4, rect.y + rect.height);
-    ctx.stroke();
-  }
-}
-
-function room1v2PlatformStyle(rect) {
-  if (rect.x === 680 || rect.x === 1810 || rect.x === 2945 || rect.x === 4515) return "wood";
-  return "stone";
-}
-
-drawWorldGeometry = function() {
-  for (const segment of MANGUE_V2_GROUND_SEGMENTS) {
-    const g = ctx.createLinearGradient(0, segment.y, 0, WORLD_HEIGHT);
-    g.addColorStop(0, "#1d3435");
-    g.addColorStop(1, "#0c1e22");
-    ctx.fillStyle = g;
-    ctx.fillRect(segment.x, segment.y, segment.width, segment.height);
-    ctx.fillStyle = "#496e4c";
-    ctx.fillRect(segment.x, segment.y, segment.width, 7);
-  }
-
-  const t = performance.now() * 0.001;
-  for (const pit of MANGUE_V2_PITS) {
-    const g = ctx.createLinearGradient(0, ground.y, 0, WORLD_HEIGHT);
-    g.addColorStop(0, "#1d6d72");
-    g.addColorStop(1, "#082d36");
-    ctx.fillStyle = g;
-    ctx.fillRect(pit.x, ground.y, pit.width, WORLD_HEIGHT - ground.y);
-
-    ctx.strokeStyle = "rgba(152,235,224,.38)";
-    ctx.lineWidth = 2;
-    for (let y = ground.y + 10; y < WORLD_HEIGHT; y += 24) {
-      const phase = Math.sin(t * 1.55 + y * .03) * 9;
-      for (let x = pit.x + 8; x < pit.x + pit.width - 22; x += 58) {
-        ctx.beginPath();
-        ctx.moveTo(x + phase, y);
-        ctx.quadraticCurveTo(x + 17 + phase, y - 3, x + 35 + phase, y);
-        ctx.stroke();
-      }
+function room1v4DrawWallTo(ctx2, rect) {
+  for (let y = rect.y; y < rect.y + rect.height; y += 64) {
+    for (let x = rect.x; x < rect.x + rect.width; x += 64) {
+      room1v4Tile(ctx2, 0, 0, x, y, 64, 64);
     }
+  }
+}
 
-    ctx.strokeStyle = "#3a2d21";
-    ctx.lineWidth = 6;
-    for (let i = 0; i < 4; i++) {
-      const x = pit.x + pit.width * (.16 + i * .22);
-      ctx.beginPath();
-      ctx.moveTo(x, ground.y + 72);
-      ctx.lineTo(x + (i % 2 ? 9 : -8), ground.y + 15);
-      ctx.stroke();
+function room1v4DrawLandmarksTo(ctx2) {
+  if (!(ROOM1V4_LAND_IMG.complete && ROOM1V4_LAND_IMG.naturalWidth)) {
+    return;
+  }
+
+  ctx2.globalAlpha = 0.72;
+  ctx2.drawImage(
+    ROOM1V4_LAND_IMG,
+    0, 0, 190, 256,
+    2050, 240, 460, 620
+  );
+
+  ctx2.globalAlpha = 0.64;
+  ctx2.drawImage(
+    ROOM1V4_LAND_IMG,
+    190, 0, 180, 256,
+    1250, 260, 360, 510
+  );
+
+  ctx2.globalAlpha = 0.80;
+  ctx2.drawImage(
+    ROOM1V4_LAND_IMG,
+    370, 0, 142, 256,
+    2970, 110, 210, 380
+  );
+
+  ctx2.globalAlpha = 1;
+}
+
+function room1v4BuildStatic() {
+  room1v4StaticDirty = false;
+
+  const s = ROOM1V4_SCTX;
+
+  s.clearRect(0, 0, ROOM1V4_STATIC.width, ROOM1V4_STATIC.height);
+
+  room1v4DrawLandmarksTo(s);
+
+  for (const floor of ROOM1V4.floors) {
+    s.fillStyle = "#142b30";
+    s.fillRect(floor.x, floor.y, floor.width, floor.height);
+
+    for (let x = floor.x; x < floor.x + floor.width; x += 64) {
+      room1v4Tile(s, 0, 1, x, floor.y - 40, 64, 64);
     }
   }
 
   for (const platform of platforms) {
-    if (room1v2PlatformStyle(platform) === "wood") room1v2Wood(platform);
-    else room1v2Stone(platform, false);
+    room1v4DrawPlatformTo(s, platform, room1v4Style(platform));
   }
-  for (const wall of walls) room1v2Stone(wall, true);
 
-  if (currentRoom === 0 && !mac.waterPower) {
-    const g = ctx.createLinearGradient(ROOM1_V2_WATER_GATE.x, 0, ROOM1_V2_WATER_GATE.x + ROOM1_V2_WATER_GATE.width, 0);
-    g.addColorStop(0, "#173d47");
-    g.addColorStop(.5, "#3b8490");
-    g.addColorStop(1, "#173d47");
-    ctx.fillStyle = g;
-    ctx.fillRect(ROOM1_V2_WATER_GATE.x, ROOM1_V2_WATER_GATE.y, ROOM1_V2_WATER_GATE.width, ROOM1_V2_WATER_GATE.height);
-    ctx.fillStyle = "rgba(111,232,243,.23)";
-    for (let y = ROOM1_V2_WATER_GATE.y + 9; y < ROOM1_V2_WATER_GATE.y + ROOM1_V2_WATER_GATE.height; y += 18) {
-      ctx.fillRect(ROOM1_V2_WATER_GATE.x + 6, y, ROOM1_V2_WATER_GATE.width - 12, 3);
+  for (const wall of walls) {
+    room1v4DrawWallTo(s, wall);
+  }
+
+  if (!mac.waterPower) {
+    for (const gate of [ROOM1V4.forwardGate, ROOM1V4.shortcutGate]) {
+      s.fillStyle = "#1b5965";
+      s.fillRect(gate.x, gate.y, gate.width, gate.height);
+
+      s.fillStyle = "#78d7da";
+
+      for (
+        let y = gate.y + 8;
+        y < gate.y + gate.height;
+        y += 18
+      ) {
+        s.fillRect(gate.x + 5, y, gate.width - 10, 3);
+      }
     }
   }
-};
-
-function room1v2FarArches(offset, alpha) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#213b41";
-  ctx.strokeStyle = "#294950";
-  for (let i = -1; i < 5; i++) {
-    const x = offset + i * 330;
-    ctx.fillRect(x, 210, 32, 210);
-    ctx.fillRect(x + 155, 230, 30, 190);
-    ctx.lineWidth = 18;
-    ctx.beginPath();
-    ctx.arc(x + 92, 250, 72, Math.PI, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
 }
 
-drawMangroveBackground = function() {
-  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-  sky.addColorStop(0, "#07151b");
-  sky.addColorStop(.42, "#0d2430");
-  sky.addColorStop(1, "#163a3c");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+function room1v4BuildBg() {
+  room1v4BgReady = true;
 
-  const warmX = WIDTH * .70 - camera.x * .035;
-  const glow = ctx.createRadialGradient(warmX, 150, 10, warmX, 150, 260);
-  glow.addColorStop(0, "rgba(255,196,103,.30)");
-  glow.addColorStop(.35, "rgba(255,181,82,.12)");
-  glow.addColorStop(1, "rgba(255,181,82,0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const b = ROOM1V4_BGCTX;
 
-  const far = -((camera.x * .055) % 430);
-  ctx.fillStyle = "rgba(23,64,54,.42)";
-  for (let i = -1; i < Math.ceil(WIDTH / 300) + 2; i++) {
-    const x = far + i * 300;
-    ctx.beginPath();
-    ctx.moveTo(x, HEIGHT * .63);
-    ctx.lineTo(x + 70, HEIGHT * .33);
-    ctx.lineTo(x + 145, HEIGHT * .58);
-    ctx.lineTo(x + 215, HEIGHT * .38);
-    ctx.lineTo(x + 300, HEIGHT * .64);
-    ctx.closePath();
-    ctx.fill();
-  }
+  const g = b.createLinearGradient(0, 0, 0, HEIGHT);
+  g.addColorStop(0, "#07161d");
+  g.addColorStop(0.45, "#0d2c32");
+  g.addColorStop(1, "#214842");
 
-  room1v2FarArches(-((camera.x * .11) % 330), .28);
+  b.fillStyle = g;
+  b.fillRect(0, 0, ROOM1V4_BG.width, HEIGHT);
 
-  ctx.save();
-  ctx.translate(WIDTH * .76 - camera.x * .035, 0);
-  ctx.globalAlpha = .30;
-  ctx.fillStyle = "#435057";
-  ctx.fillRect(-55, 170, 128, 116);
-  ctx.fillRect(-82, 120, 30, 166);
-  ctx.fillRect(76, 120, 30, 166);
-  ctx.fillStyle = "#d5b56f";
-  ctx.fillRect(-8, 208, 30, 78);
-  ctx.restore();
+  // Distant mangrove trunks.
+  b.fillStyle = "rgba(47,92,70,.46)";
 
-  const mid = -((camera.x * .19) % 180);
-  ctx.strokeStyle = "rgba(20,48,39,.78)";
-  ctx.lineCap = "round";
-  for (let i = -1; i < Math.ceil(WIDTH / 155) + 2; i++) {
-    const x = mid + i * 155 + 30;
-    const top = 165 + (i % 3) * 20;
-    ctx.lineWidth = 9;
-    ctx.beginPath();
-    ctx.moveTo(x, 440);
-    ctx.quadraticCurveTo(x - 15, 300, x, top);
-    ctx.stroke();
-    ctx.lineWidth = 4;
+  for (let i = 0; i < 12; i++) {
+    const x = i * 195 + 30;
+
+    b.fillRect(x, 160 + (i % 3) * 28, 14, 300);
+
     for (let a = -2; a <= 2; a++) {
-      ctx.beginPath();
-      ctx.moveTo(x, top + 10);
-      ctx.quadraticCurveTo(x + a * 18, top - 14, x + a * 36, top + 12);
-      ctx.stroke();
+      b.fillRect(
+        x + a * 25,
+        165 + Math.abs(a) * 10,
+        42,
+        9
+      );
     }
   }
 
-  const waterY = HEIGHT * .68;
-  const wg = ctx.createLinearGradient(0, waterY, 0, HEIGHT);
-  wg.addColorStop(0, "rgba(28,110,116,.36)");
-  wg.addColorStop(1, "rgba(6,45,55,.58)");
-  ctx.fillStyle = wg;
-  ctx.fillRect(0, waterY, WIDTH, HEIGHT - waterY);
+  // Distant ruined aqueduct.
+  b.fillStyle = "rgba(63,83,76,.42)";
 
-  ctx.strokeStyle = "rgba(183,236,223,.22)";
-  ctx.lineWidth = 2;
-  const t = performance.now() * .001;
-  for (let y = waterY + 12; y < HEIGHT; y += 22) {
-    const phase = Math.sin(t * 1.3 + y * .03) * 15;
-    for (let x = -90; x < WIDTH + 90; x += 105) {
-      ctx.beginPath();
-      ctx.moveTo(x + phase, y);
-      ctx.lineTo(x + 46 + phase, y);
-      ctx.stroke();
+  for (let i = 0; i < 7; i++) {
+    const x = i * 330 + 80;
+
+    b.fillRect(x, 235, 28, 205);
+    b.fillRect(x + 150, 265, 26, 175);
+    b.fillRect(x + 28, 235, 122, 12);
+  }
+
+  const water = b.createLinearGradient(0, 390, 0, HEIGHT);
+  water.addColorStop(0, "rgba(56,138,141,.38)");
+  water.addColorStop(1, "rgba(13,65,74,.58)");
+
+  b.fillStyle = water;
+  b.fillRect(0, 390, ROOM1V4_BG.width, HEIGHT - 390);
+
+  b.fillStyle = "rgba(220,244,221,.17)";
+
+  for (let y = 405; y < HEIGHT; y += 25) {
+    for (let x = 0; x < ROOM1V4_BG.width; x += 100) {
+      b.fillRect(x + (y % 3) * 12, y, 38, 2);
     }
   }
-};
-
-function room1v2Lantern(x, y, color = "#ffbe70") {
-  ctx.save();
-  const glow = ctx.createRadialGradient(x, y, 6, x, y, 72);
-  glow.addColorStop(0, color === "#ffbe70" ? "rgba(255,190,112,.28)" : "rgba(99,235,211,.22)");
-  glow.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(x - 75, y - 75, 150, 150);
-  ctx.fillStyle = "#2e2420";
-  ctx.fillRect(x - 5, y - 11, 10, 18);
-  ctx.fillStyle = color;
-  ctx.fillRect(x - 3, y - 7, 6, 10);
-  ctx.restore();
 }
 
-function room1v2Flask(x, y, color) {
-  ctx.save();
-  ctx.strokeStyle = "#1d2626";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x, y - 42);
-  ctx.lineTo(x, y - 18);
-  ctx.stroke();
+room1v4BuildBg();
 
-  const glow = ctx.createRadialGradient(x, y, 2, x, y, 38);
-  glow.addColorStop(0, color === "green" ? "rgba(77,255,167,.28)" : "rgba(184,92,255,.26)");
-  glow.addColorStop(1, "rgba(0,0,0,0)");
+function drawMangroveBackground() {
+  if (!room1v4BgReady) {
+    room1v4BuildBg();
+  }
+
+  const span = ROOM1V4_BG.width;
+  const offset = -Math.floor((camera.x * 0.10) % span);
+
+  ctx.drawImage(ROOM1V4_BG, offset, 0);
+  ctx.drawImage(ROOM1V4_BG, offset + span, 0);
+
+  const x = WIDTH * 0.72;
+
+  const glow =
+    ctx.createRadialGradient(
+      x, 135, 10,
+      x, 135, 260
+    );
+
+  glow.addColorStop(0, "rgba(255,191,104,.20)");
+  glow.addColorStop(1, "rgba(255,191,104,0)");
+
   ctx.fillStyle = glow;
-  ctx.fillRect(x - 42, y - 42, 84, 84);
-
-  ctx.fillStyle = color === "green" ? "#43d985" : "#a85be8";
-  ctx.beginPath();
-  ctx.arc(x, y, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(231,255,245,.45)";
-  ctx.fillRect(x - 2, y - 4, 3, 3);
-  ctx.restore();
+  ctx.fillRect(x - 270, -20, 540, 460);
 }
 
-drawMangroveWorldDecor = function() {
+function drawWorldGeometry() {
+  if (room1v4StaticDirty) {
+    room1v4BuildStatic();
+  }
+
+  const sx =
+    Math.max(
+      0,
+      Math.min(
+        WORLD_WIDTH - WIDTH,
+        Math.floor(camera.x)
+      )
+    );
+
+  const visibleW =
+    Math.min(
+      WIDTH,
+      WORLD_WIDTH - sx
+    );
+
+  ctx.drawImage(
+    ROOM1V4_STATIC,
+    sx, 0,
+    visibleW, HEIGHT,
+    sx, 0,
+    visibleW, HEIGHT
+  );
+
+  // Only water animates every frame.
+  const t = performance.now() * 0.001;
+
+  for (const pit of ROOM1V4.pits) {
+    const g =
+      ctx.createLinearGradient(
+        0,
+        ground.y,
+        0,
+        WORLD_HEIGHT
+      );
+
+    g.addColorStop(0, "#257b7f");
+    g.addColorStop(1, "#071f29");
+
+    ctx.fillStyle = g;
+
+    ctx.fillRect(
+      pit.x,
+      ground.y,
+      pit.width,
+      WORLD_HEIGHT - ground.y
+    );
+
+    ctx.fillStyle = "rgba(180,240,228,.38)";
+    ctx.fillRect(pit.x, ground.y, pit.width, 3);
+
+    for (
+      let y = ground.y + 14;
+      y < WORLD_HEIGHT;
+      y += 26
+    ) {
+      const phase =
+        Math.round(
+          Math.sin(t * 1.5 + y * 0.025) * 8
+        );
+
+      for (
+        let x = pit.x + 8;
+        x < pit.x + pit.width - 20;
+        x += 60
+      ) {
+        ctx.fillRect(x + phase, y, 28, 2);
+      }
+    }
+  }
+}
+
+function drawMangroveWorldDecor() {
   if (currentRoom !== 0) return;
 
-  const tx = 2440;
   ctx.save();
-  ctx.fillStyle = "#231b18";
-  ctx.fillRect(tx - 45, 270, 210, 490);
-  ctx.fillStyle = "#3a2b22";
-  ctx.fillRect(tx - 10, 270, 34, 490);
-  ctx.fillRect(tx + 62, 270, 28, 490);
-  ctx.fillRect(tx + 118, 270, 24, 490);
-  ctx.fillStyle = "#102b23";
-  ctx.fillRect(tx - 120, 210, 420, 36);
-  ctx.fillRect(tx - 60, 175, 315, 28);
-  ctx.restore();
 
-  ctx.strokeStyle = "#33271f";
+  ctx.strokeStyle = "#2b2018";
   ctx.lineCap = "round";
-  for (const rx of [90, 1170, 2500, 3660, 4700]) {
-    ctx.lineWidth = 18;
+
+  for (const rootX of [80,1120,2240,3550,4700]) {
+    ctx.lineWidth = 17;
+
     ctx.beginPath();
-    ctx.moveTo(rx, ground.y + 18);
-    ctx.bezierCurveTo(rx - 65, ground.y - 70, rx + 44, ground.y - 180, rx + 20, ground.y - 300);
+
+    ctx.moveTo(
+      rootX,
+      ground.y + 18
+    );
+
+    ctx.bezierCurveTo(
+      rootX - 60,
+      ground.y - 80,
+      rootX + 45,
+      ground.y - 210,
+      rootX + 15,
+      ground.y - 330
+    );
+
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#1a2222";
-  ctx.lineWidth = 4;
-  for (const cx of [1380, 2030, 3910, 4450]) {
-    ctx.beginPath();
-    ctx.moveTo(cx, 0);
-    ctx.lineTo(cx, 185 + (cx % 3) * 25);
-    ctx.stroke();
-  }
+  ctx.restore();
+}
 
-  for (const cage of [[2030,240],[3910,215]]) {
-    const [x, y] = cage;
-    ctx.strokeStyle = "#232928";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(x - 22, y, 44, 64);
-    for (let xx = x - 14; xx <= x + 14; xx += 9) {
-      ctx.beginPath();
-      ctx.moveTo(xx, y + 4);
-      ctx.lineTo(xx, y + 60);
-      ctx.stroke();
-    }
-  }
+const __room1v4GrappleFallback = drawGrapplePoint;
 
-  room1v2Flask(1535, 255, "green");
-  room1v2Flask(2890, 175, "purple");
-  room1v2Flask(4220, 245, "green");
-
-  room1v2Lantern(560, 590);
-  room1v2Lantern(1670, 435);
-  room1v2Lantern(3025, 220, "#63ebd3");
-  room1v2Lantern(4320, 430);
-
-  ctx.fillStyle = "#283d42";
-  ctx.fillRect(3000, 245, 210, 510);
-  ctx.fillStyle = "#3d5960";
-  ctx.fillRect(3000, 245, 210, 12);
-  ctx.fillStyle = "#102429";
-  ctx.fillRect(3065, 330, 80, 145);
-  ctx.fillStyle = "#3d8792";
-  for (let x = 3074; x < 3144; x += 14) ctx.fillRect(x, 335, 5, 135);
-};
-
-const __room1v2DrawGrapple = drawGrapplePoint;
 drawGrapplePoint = function() {
   if (currentRoom !== 0) {
-    __room1v2DrawGrapple();
+    __room1v4GrappleFallback();
     return;
   }
 
   const origin = getTongueOrigin();
+
   for (const anchor of MANGUE_V2_ANCHORS) {
-    const d = distance(origin.x, origin.y, anchor.x, anchor.y);
-    const dir = anchor.x >= origin.x ? 1 : -1;
-    const reachable = !grapple.active && d <= anchor.grabRange && (dir === mac.facing || d <= 185) && tongueLineClearToPoint(anchor.x, anchor.y);
+    const d =
+      distance(
+        origin.x,
+        origin.y,
+        anchor.x,
+        anchor.y
+      );
+
+    const direction =
+      anchor.x >= origin.x
+        ? 1
+        : -1;
+
+    const reachable =
+      !grapple.active &&
+      d <= anchor.grabRange &&
+      (
+        direction === mac.facing ||
+        d <= 180
+      ) &&
+      tongueLineClearToPoint(
+        anchor.x,
+        anchor.y
+      );
 
     ctx.save();
-    ctx.strokeStyle = anchor.kind === "vine" ? "#355843" : "#3b2d22";
-    ctx.lineCap = "round";
-    ctx.lineWidth = anchor.kind === "vine" ? 6 : 10;
+
+    ctx.strokeStyle =
+      anchor.kind === "vine"
+        ? "#406447"
+        : "#4d3625";
+
+    ctx.lineWidth =
+      anchor.kind === "vine"
+        ? 6
+        : 9;
+
     ctx.beginPath();
-    ctx.moveTo(anchor.x - (anchor.kind === "vine" ? 0 : 48), anchor.y - 60);
-    ctx.quadraticCurveTo(anchor.x - 8, anchor.y - 28, anchor.x, anchor.y);
+
+    ctx.moveTo(
+      anchor.x -
+        (
+          anchor.kind === "vine"
+            ? 0
+            : 46
+        ),
+      anchor.y - 60
+    );
+
+    ctx.quadraticCurveTo(
+      anchor.x - 7,
+      anchor.y - 28,
+      anchor.x,
+      anchor.y
+    );
+
     ctx.stroke();
 
-    ctx.fillStyle = reachable ? "#c7e28f" : "#71855a";
+    ctx.fillStyle =
+      reachable
+        ? "#d0e68e"
+        : "#81945d";
+
     ctx.beginPath();
-    ctx.ellipse(anchor.x, anchor.y, 10, 7, -.2, 0, Math.PI * 2);
+
+    ctx.ellipse(
+      anchor.x,
+      anchor.y,
+      10,
+      7,
+      0,
+      0,
+      Math.PI * 2
+    );
+
     ctx.fill();
 
-    if (reachable) {
-      ctx.fillStyle = "rgba(211,243,163,.15)";
-      ctx.beginPath();
-      ctx.arc(anchor.x, anchor.y, 22, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 };
 
-function room1v2Foreground() {
-  if (currentRoom !== 0) return;
+function room1v4Foreground() {
   ctx.save();
-  ctx.globalAlpha = .72;
-  ctx.strokeStyle = "#081915";
+
+  ctx.globalAlpha = 0.64;
+  ctx.strokeStyle = "#071914";
   ctx.lineCap = "round";
-  const off = -((camera.x * .045) % 250);
+
+  const offset =
+    -(
+      (
+        camera.x * 0.035
+      ) %
+      260
+    );
+
   for (let i = -1; i < 7; i++) {
-    const x = off + i * 240;
-    ctx.lineWidth = 18;
+    const x =
+      offset +
+      i * 245;
+
+    ctx.lineWidth = 16;
+
     ctx.beginPath();
-    ctx.moveTo(x, HEIGHT + 20);
-    ctx.quadraticCurveTo(x - 35, HEIGHT - 100, x + 12, HEIGHT - 205);
+
+    ctx.moveTo(
+      x,
+      HEIGHT + 20
+    );
+
+    ctx.quadraticCurveTo(
+      x - 30,
+      HEIGHT - 100,
+      x + 10,
+      HEIGHT - 200
+    );
+
     ctx.stroke();
+
     ctx.lineWidth = 7;
+
     ctx.beginPath();
-    ctx.moveTo(x, HEIGHT - 95);
-    ctx.lineTo(x - 65, HEIGHT - 135);
-    ctx.moveTo(x + 8, HEIGHT - 80);
-    ctx.lineTo(x + 72, HEIGHT - 120);
+    ctx.moveTo(x, HEIGHT - 90);
+    ctx.lineTo(x - 60, HEIGHT - 132);
+    ctx.moveTo(x + 8, HEIGHT - 78);
+    ctx.lineTo(x + 65, HEIGHT - 118);
     ctx.stroke();
   }
+
   ctx.restore();
 
-  const vignette = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, HEIGHT * .26, WIDTH / 2, HEIGHT / 2, WIDTH * .72);
+  const vignette =
+    ctx.createRadialGradient(
+      WIDTH / 2,
+      HEIGHT / 2,
+      HEIGHT * 0.30,
+      WIDTH / 2,
+      HEIGHT / 2,
+      WIDTH * 0.72
+    );
+
   vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,10,13,.42)");
+  vignette.addColorStop(1, "rgba(0,8,11,.36)");
+
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-};
+}
 
-const __room1v2Draw = draw;
+const __room1v4DrawFallback = draw;
+
 draw = function() {
   if (currentRoom !== 0) {
-    __room1v2Draw();
+    __room1v4DrawFallback();
     return;
   }
 
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
   drawMangroveBackground();
 
   ctx.save();
-  ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+  ctx.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
   drawMangroveWorldDecor();
   drawWorldGeometry();
   drawBossGate();
@@ -582,1034 +808,21 @@ draw = function() {
   drawMacGroundShadow();
 
   if (!mac.dead) {
-    const blink = mac.invulnerableTimer > 0 && Math.floor(mac.invulnerableTimer * 18) % 2 === 0;
-    if (!blink) drawMacSprite();
+    const blink =
+      mac.invulnerableTimer > 0 &&
+      Math.floor(mac.invulnerableTimer * 18) % 2 === 0;
+
+    if (!blink) {
+      drawMacSprite();
+    }
+
     drawMacHitbox();
   }
 
   drawTongueHitbox();
+
   ctx.restore();
 
-  room1v2Foreground();
+  room1v4Foreground();
   drawHUD();
-};
-
-
-let room1v2HadWaterPower = mac.waterPower;
-const __room1v2Update = update;
-update = function(dt) {
-  __room1v2Update(dt);
-
-  if (currentRoom === 0 && room1v2HadWaterPower !== mac.waterPower) {
-    room1v2HadWaterPower = mac.waterPower;
-    rebuildSolids();
-  }
-};
-
-
-// ============================================================
-// ROOM 1 V3 — CC0 ONLINE PIXEL ART ASSETS
-// Fontes CC0:
-// - surt — Classical Ruin Tiles
-//   https://opengameart.org/content/classical-ruin-tiles
-// - Neburov — Pixel platformer tile set
-//   https://opengameart.org/content/pixel-platformer-tile-set
-// - Kthulhu1947 — TileSet 2D Platformer 32x32
-//   https://opengameart.org/content/tileset-2d-platformer-32x32
-//
-// Os assets remotos são usados como camada gráfica. Se algum falhar,
-// o cenário V2 continua desenhando o fallback já existente.
-// ============================================================
-
-const ROOM1V3_ASSET_URLS = {
-  ruins:
-    "https://opengameart.org/sites/default/files/classical_ruin_tiles_1.png",
-
-  platform:
-    "https://opengameart.org/sites/default/files/Sprute.png",
-
-  mud:
-    "https://opengameart.org/sites/default/files/platFormTileSet02_32x32.png"
-};
-
-const ROOM1V3_ASSETS = {
-  ruins: new Image(),
-  platform: new Image(),
-  mud: new Image()
-};
-
-ROOM1V3_ASSETS.ruins.decoding = "async";
-ROOM1V3_ASSETS.platform.decoding = "async";
-ROOM1V3_ASSETS.mud.decoding = "async";
-
-ROOM1V3_ASSETS.ruins.src =
-  ROOM1V3_ASSET_URLS.ruins;
-
-ROOM1V3_ASSETS.platform.src =
-  ROOM1V3_ASSET_URLS.platform;
-
-ROOM1V3_ASSETS.mud.src =
-  ROOM1V3_ASSET_URLS.mud;
-
-function room1v3Ready(image) {
-  return (
-    image &&
-    image.complete &&
-    image.naturalWidth > 0 &&
-    image.naturalHeight > 0
-  );
-}
-
-function room1v3DrawImage(
-  image,
-  sx,
-  sy,
-  sw,
-  sh,
-  dx,
-  dy,
-  dw,
-  dh,
-  opts = {}
-) {
-  if (!room1v3Ready(image)) {
-    return false;
-  }
-
-  ctx.save();
-
-  ctx.imageSmoothingEnabled = false;
-
-  if (opts.alpha != null) {
-    ctx.globalAlpha =
-      opts.alpha;
-  }
-
-  if (opts.filter) {
-    ctx.filter =
-      opts.filter;
-  }
-
-  if (opts.flipX) {
-    ctx.translate(
-      dx + dw,
-      dy
-    );
-
-    ctx.scale(
-      -1,
-      1
-    );
-
-    ctx.drawImage(
-      image,
-      sx,
-      sy,
-      sw,
-      sh,
-      0,
-      0,
-      dw,
-      dh
-    );
-  } else {
-    ctx.drawImage(
-      image,
-      sx,
-      sy,
-      sw,
-      sh,
-      dx,
-      dy,
-      dw,
-      dh
-    );
-  }
-
-  ctx.restore();
-
-  return true;
-}
-
-function room1v3DrawTile(
-  image,
-  tileX,
-  tileY,
-  dx,
-  dy,
-  size = 32,
-  opts = {}
-) {
-  return room1v3DrawImage(
-    image,
-    tileX * 32,
-    tileY * 32,
-    32,
-    32,
-    dx,
-    dy,
-    size,
-    size,
-    opts
-  );
-}
-
-// ------------------------------------------------------------
-// Asset-based stone.
-// Sprute.png tem tiles 32x32 e funciona muito melhor que blocos
-// lisos para a leitura da colisão.
-// ------------------------------------------------------------
-
-function room1v3DrawStonePlatform(
-  rect,
-  wall = false
-) {
-  if (
-    !room1v3Ready(
-      ROOM1V3_ASSETS.platform
-    )
-  ) {
-    room1v2Stone(
-      rect,
-      wall
-    );
-
-    return;
-  }
-
-  const tileSize = 32;
-
-  const topY =
-    Math.floor(
-      rect.y /
-      tileSize
-    ) *
-    tileSize;
-
-  // Sprute:
-  // teal brick = 0,2
-  // dark earth = 7,0
-  // grass / damp earth = 7,2
-  const brickTile = {
-    x: 0,
-    y: 2
-  };
-
-  const bodyTile = {
-    x: 7,
-    y: 0
-  };
-
-  const mossTile = {
-    x: 7,
-    y: 2
-  };
-
-  for (
-    let y =
-      topY;
-    y <
-      rect.y +
-      rect.height;
-    y += tileSize
-  ) {
-    for (
-      let x =
-        Math.floor(
-          rect.x /
-          tileSize
-        ) *
-        tileSize;
-      x <
-        rect.x +
-        rect.width;
-      x += tileSize
-    ) {
-      const firstRow =
-        y <= rect.y + 4;
-
-      const tx =
-        firstRow
-          ? brickTile.x
-          : bodyTile.x;
-
-      const ty =
-        firstRow
-          ? brickTile.y
-          : bodyTile.y;
-
-      room1v3DrawTile(
-        ROOM1V3_ASSETS.platform,
-        tx,
-        ty,
-        x,
-        y,
-        tileSize,
-        {
-          filter:
-            wall
-              ? "hue-rotate(12deg) saturate(.70) brightness(.62)"
-              : "hue-rotate(10deg) saturate(.80) brightness(.74)"
-        }
-      );
-    }
-  }
-
-  // Corrige exatamente a superfície jogável.
-  for (
-    let x =
-      rect.x;
-    x <
-      rect.x +
-      rect.width;
-    x += tileSize
-  ) {
-    ctx.save();
-
-    ctx.beginPath();
-
-    ctx.rect(
-      x,
-      rect.y - 3,
-      Math.min(
-        tileSize,
-        rect.x +
-          rect.width -
-          x
-      ),
-      12
-    );
-
-    ctx.clip();
-
-    room1v3DrawTile(
-      ROOM1V3_ASSETS.platform,
-      mossTile.x,
-      mossTile.y,
-      x,
-      rect.y - 22,
-      tileSize,
-      {
-        filter:
-          "hue-rotate(8deg) saturate(.88) brightness(.78)"
-      }
-    );
-
-    ctx.restore();
-  }
-
-  // Profundidade / sombra da borda.
-  ctx.fillStyle =
-    wall
-      ? "rgba(1,13,18,.40)"
-      : "rgba(1,13,18,.25)";
-
-  ctx.fillRect(
-    rect.x,
-    rect.y +
-      rect.height -
-      5,
-    rect.width,
-    5
-  );
-}
-
-function room1v3DrawWoodPlatform(
-  rect
-) {
-  // O próprio tileset do Neburov possui tábuas e caixas.
-  if (
-    room1v3Ready(
-      ROOM1V3_ASSETS.platform
-    )
-  ) {
-    const tileSize = 32;
-
-    for (
-      let x =
-        rect.x;
-      x <
-        rect.x +
-        rect.width;
-      x += tileSize
-    ) {
-      // Tile de madeira/plataforma do canto inferior esquerdo.
-      room1v3DrawTile(
-        ROOM1V3_ASSETS.platform,
-        1,
-        6,
-        x,
-        rect.y - 6,
-        tileSize,
-        {
-          filter:
-            "saturate(.72) brightness(.68)"
-        }
-      );
-    }
-
-    ctx.fillStyle =
-      "rgba(18,12,10,.55)";
-
-    ctx.fillRect(
-      rect.x,
-      rect.y +
-        rect.height -
-        4,
-      rect.width,
-      6
-    );
-
-    return;
-  }
-
-  room1v2Wood(
-    rect
-  );
-}
-
-// ------------------------------------------------------------
-// Ruínas CC0 como verdadeiros sprites de landmark.
-// O atlas do surt é 640x256.
-// ------------------------------------------------------------
-
-function room1v3DrawRuinLandmarks() {
-  if (
-    !room1v3Ready(
-      ROOM1V3_ASSETS.ruins
-    )
-  ) {
-    return;
-  }
-
-  const backFilter =
-    "hue-rotate(132deg) saturate(.44) brightness(.40) contrast(1.08)";
-
-  const middleFilter =
-    "hue-rotate(126deg) saturate(.52) brightness(.52) contrast(1.05)";
-
-  // Ruína de entrada.
-  room1v3DrawImage(
-    ROOM1V3_ASSETS.ruins,
-    0,
-    0,
-    255,
-    256,
-    220,
-    305,
-    510,
-    512,
-    {
-      filter:
-        middleFilter,
-      alpha:
-        .78
-    }
-  );
-
-  // Claustro / torre no meio.
-  room1v3DrawImage(
-    ROOM1V3_ASSETS.ruins,
-    256,
-    0,
-    256,
-    256,
-    1230,
-    250,
-    640,
-    640,
-    {
-      filter:
-        middleFilter,
-      alpha:
-        .82
-    }
-  );
-
-  // Ruína atrás da árvore colossal.
-  room1v3DrawImage(
-    ROOM1V3_ASSETS.ruins,
-    0,
-    0,
-    255,
-    256,
-    2200,
-    235,
-    610,
-    610,
-    {
-      filter:
-        backFilter,
-      alpha:
-        .62,
-      flipX:
-        true
-    }
-  );
-
-  // Santuário alto.
-  room1v3DrawImage(
-    ROOM1V3_ASSETS.ruins,
-    256,
-    0,
-    256,
-    256,
-    2760,
-    100,
-    640,
-    640,
-    {
-      filter:
-        "hue-rotate(125deg) saturate(.52) brightness(.57) contrast(1.08)",
-      alpha:
-        .90
-    }
-  );
-
-  // Ruínas finais.
-  room1v3DrawImage(
-    ROOM1V3_ASSETS.ruins,
-    0,
-    0,
-    255,
-    256,
-    3900,
-    285,
-    650,
-    650,
-    {
-      filter:
-        middleFilter,
-      alpha:
-        .80
-    }
-  );
-}
-
-function room1v3DrawDistantRuins() {
-  if (
-    !room1v3Ready(
-      ROOM1V3_ASSETS.ruins
-    )
-  ) {
-    return;
-  }
-
-  ctx.save();
-
-  const px =
-    -(
-      (
-        camera.x *
-        .10
-      ) %
-      680
-    );
-
-  for (
-    let i = -1;
-    i < 4;
-    i++
-  ) {
-    room1v3DrawImage(
-      ROOM1V3_ASSETS.ruins,
-      256,
-      0,
-      256,
-      256,
-      px +
-        i * 680,
-      140,
-      560,
-      560,
-      {
-        filter:
-          "hue-rotate(135deg) saturate(.35) brightness(.30)",
-        alpha:
-          .35,
-        flipX:
-          i % 2 === 0
-      }
-    );
-  }
-
-  ctx.restore();
-}
-
-// ------------------------------------------------------------
-// Ground texture from a second CC0 32x32 pack.
-// ------------------------------------------------------------
-
-function room1v3GroundTexture(
-  segment
-) {
-  if (
-    !room1v3Ready(
-      ROOM1V3_ASSETS.mud
-    )
-  ) {
-    return;
-  }
-
-  ctx.save();
-
-  ctx.beginPath();
-
-  ctx.rect(
-    segment.x,
-    segment.y,
-    segment.width,
-    Math.min(
-      160,
-      segment.height
-    )
-  );
-
-  ctx.clip();
-
-  const size = 64;
-
-  for (
-    let y =
-      segment.y;
-    y <
-      segment.y +
-      160;
-    y += size
-  ) {
-    for (
-      let x =
-        segment.x;
-      x <
-        segment.x +
-        segment.width;
-      x += size
-    ) {
-      const sx =
-        (
-          Math.floor(
-            x /
-            size
-          ) %
-          4
-        );
-
-      const sy =
-        (
-          Math.floor(
-            y /
-            size
-          ) %
-          4
-        );
-
-      room1v3DrawTile(
-        ROOM1V3_ASSETS.mud,
-        sx,
-        sy,
-        x,
-        y,
-        size,
-        {
-          filter:
-            "hue-rotate(115deg) saturate(.50) brightness(.40) contrast(1.15)",
-          alpha:
-            .50
-        }
-      );
-    }
-  }
-
-  ctx.restore();
-}
-
-// ------------------------------------------------------------
-// Props from the free Neburov sprite sheet.
-// ------------------------------------------------------------
-
-function room1v3DrawCrate(
-  x,
-  y,
-  scale = 1
-) {
-  if (
-    !room1v3Ready(
-      ROOM1V3_ASSETS.platform
-    )
-  ) {
-    return;
-  }
-
-  room1v3DrawTile(
-    ROOM1V3_ASSETS.platform,
-    0,
-    3,
-    x,
-    y,
-    32 * scale,
-    {
-      filter:
-        "saturate(.72) brightness(.68)"
-    }
-  );
-}
-
-function room1v3DrawProps() {
-  room1v3DrawCrate(
-    390,
-    664,
-    1
-  );
-
-  room1v3DrawCrate(
-    430,
-    664,
-    .85
-  );
-
-  room1v3DrawCrate(
-    1815,
-    579,
-    1
-  );
-
-  room1v3DrawCrate(
-    3955,
-    589,
-    1
-  );
-
-  // Vegetação do mesmo atlas.
-  if (
-    room1v3Ready(
-      ROOM1V3_ASSETS.platform
-    )
-  ) {
-    const plants = [
-      [535, 598],
-      [1525, 510],
-      [2665, 355],
-      [3060, 217],
-      [3890, 592],
-      [4380, 430]
-    ];
-
-    for (
-      const [x, y]
-      of plants
-    ) {
-      room1v3DrawTile(
-        ROOM1V3_ASSETS.platform,
-        6,
-        6,
-        x,
-        y,
-        48,
-        {
-          filter:
-            "hue-rotate(25deg) saturate(.82) brightness(.68)"
-        }
-      );
-    }
-  }
-}
-
-// ------------------------------------------------------------
-// Overrides finais.
-// ------------------------------------------------------------
-
-const __room1v3BackgroundFallback =
-  drawMangroveBackground;
-
-drawMangroveBackground = function() {
-  __room1v3BackgroundFallback();
-
-  // Distant ruins are placed in screen space,
-  // so the camera parallax is calculated inside.
-  room1v3DrawDistantRuins();
-
-  // Warm haze over the distant ruins.
-  const x =
-    WIDTH *
-    .70;
-
-  const g =
-    ctx.createRadialGradient(
-      x,
-      160,
-      10,
-      x,
-      160,
-      310
-    );
-
-  g.addColorStop(
-    0,
-    "rgba(255,188,99,.15)"
-  );
-
-  g.addColorStop(
-    1,
-    "rgba(255,188,99,0)"
-  );
-
-  ctx.fillStyle = g;
-
-  ctx.fillRect(
-    x - 320,
-    -30,
-    640,
-    520
-  );
-};
-
-drawWorldGeometry = function() {
-  for (
-    const segment
-    of MANGUE_V2_GROUND_SEGMENTS
-  ) {
-    const g =
-      ctx.createLinearGradient(
-        0,
-        segment.y,
-        0,
-        WORLD_HEIGHT
-      );
-
-    g.addColorStop(
-      0,
-      "#10282d"
-    );
-
-    g.addColorStop(
-      1,
-      "#07171b"
-    );
-
-    ctx.fillStyle = g;
-
-    ctx.fillRect(
-      segment.x,
-      segment.y,
-      segment.width,
-      segment.height
-    );
-
-    room1v3GroundTexture(
-      segment
-    );
-
-    ctx.fillStyle =
-      "#3f684b";
-
-    ctx.fillRect(
-      segment.x,
-      segment.y,
-      segment.width,
-      6
-    );
-  }
-
-  // Água continua procedural para poder animar,
-  // mas agora fica cercada pelos tiles reais.
-  const t =
-    performance.now() *
-    .001;
-
-  for (
-    const pit
-    of MANGUE_V2_PITS
-  ) {
-    const g =
-      ctx.createLinearGradient(
-        0,
-        ground.y,
-        0,
-        WORLD_HEIGHT
-      );
-
-    g.addColorStop(
-      0,
-      "#1b737a"
-    );
-
-    g.addColorStop(
-      .35,
-      "#0b4b57"
-    );
-
-    g.addColorStop(
-      1,
-      "#041d26"
-    );
-
-    ctx.fillStyle = g;
-
-    ctx.fillRect(
-      pit.x,
-      ground.y,
-      pit.width,
-      WORLD_HEIGHT -
-        ground.y
-    );
-
-    ctx.fillStyle =
-      "rgba(137,230,222,.55)";
-
-    ctx.fillRect(
-      pit.x,
-      ground.y,
-      pit.width,
-      3
-    );
-
-    ctx.fillStyle =
-      "rgba(181,237,226,.26)";
-
-    for (
-      let y =
-        ground.y + 13;
-      y <
-        WORLD_HEIGHT;
-      y += 25
-    ) {
-      const phase =
-        Math.round(
-          Math.sin(
-            t * 1.5 +
-            y * .025
-          ) *
-          9
-        );
-
-      for (
-        let x =
-          pit.x + 8;
-        x <
-          pit.x +
-          pit.width -
-          25;
-        x += 60
-      ) {
-        ctx.fillRect(
-          x + phase,
-          y,
-          28,
-          2
-        );
-      }
-    }
-  }
-
-  for (
-    const platform
-    of platforms
-  ) {
-    if (
-      room1v2PlatformStyle(
-        platform
-      ) === "wood"
-    ) {
-      room1v3DrawWoodPlatform(
-        platform
-      );
-    } else {
-      room1v3DrawStonePlatform(
-        platform,
-        false
-      );
-    }
-  }
-
-  for (
-    const wall
-    of walls
-  ) {
-    room1v3DrawStonePlatform(
-      wall,
-      true
-    );
-  }
-
-  if (
-    currentRoom === 0 &&
-    !mac.waterPower
-  ) {
-    const gate =
-      ROOM1_V2_WATER_GATE;
-
-    const gateGradient =
-      ctx.createLinearGradient(
-        gate.x,
-        0,
-        gate.x +
-          gate.width,
-        0
-      );
-
-    gateGradient.addColorStop(
-      0,
-      "#13333d"
-    );
-
-    gateGradient.addColorStop(
-      .50,
-      "#49a2aa"
-    );
-
-    gateGradient.addColorStop(
-      1,
-      "#13333d"
-    );
-
-    ctx.fillStyle =
-      gateGradient;
-
-    ctx.fillRect(
-      gate.x,
-      gate.y,
-      gate.width,
-      gate.height
-    );
-
-    ctx.fillStyle =
-      "rgba(145,243,239,.32)";
-
-    for (
-      let y =
-        gate.y + 10;
-      y <
-        gate.y +
-        gate.height;
-      y += 18
-    ) {
-      ctx.fillRect(
-        gate.x + 5,
-        y,
-        gate.width - 10,
-        3
-      );
-    }
-  }
-};
-
-const __room1v3DecorFallback =
-  drawMangroveWorldDecor;
-
-drawMangroveWorldDecor = function() {
-  if (
-    currentRoom !== 0
-  ) {
-    __room1v3DecorFallback();
-    return;
-  }
-
-  // Sprite landmarks first.
-  room1v3DrawRuinLandmarks();
-
-  // Existing procedural roots/tree/lanterns are kept
-  // because they blend the CC0 ruins into the mangrove biome.
-  __room1v3DecorFallback();
-
-  room1v3DrawProps();
 };
