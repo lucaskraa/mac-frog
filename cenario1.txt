@@ -1,0 +1,629 @@
+roomNames[0] = "Área 1 - Mangue das Ruínas";
+ground.width = WORLD_WIDTH;
+checkpoints[0].x = 220;
+checkpoints[0].y = 690;
+checkpoints[1].x = 3860;
+checkpoints[1].y = 690;
+const MANGUE_ROOM_0_PLATFORMS = [
+  { x: 300,  y: 700, width: 220, height: 20 },
+  { x: 610,  y: 650, width: 190, height: 20 },
+  { x: 900,  y: 590, width: 225, height: 20 },
+  { x: 1240, y: 690, width: 230, height: 20 },
+  { x: 1540, y: 625, width: 195, height: 20 },
+  { x: 1840, y: 560, width: 220, height: 20 },
+  { x: 2165, y: 700, width: 270, height: 20 },
+  { x: 2530, y: 645, width: 205, height: 20 },
+  { x: 2840, y: 585, width: 235, height: 20 },
+  { x: 3200, y: 700, width: 260, height: 20 },
+  { x: 3550, y: 640, width: 220, height: 20 },
+  { x: 3870, y: 575, width: 190, height: 20 },
+  { x: 4160, y: 690, width: 230, height: 20 },
+  { x: 4470, y: 625, width: 205, height: 20 }
+];
+const MANGUE_ROOM_0_WALLS = [
+  { x: 1135, y: 630, width: 48, height: 130 },
+  { x: 1745, y: 600, width: 48, height: 160 },
+  { x: 2465, y: 635, width: 50, height: 125 },
+  { x: 3100, y: 610, width: 52, height: 150 },
+  { x: 4075, y: 620, width: 50, height: 140 }
+];
+const MANGUE_ROOM_1_PLATFORMS = [
+  { x: 300,  y: 700, width: 190, height: 18 },
+  { x: 620,  y: 640, width: 200, height: 18 },
+  { x: 930,  y: 580, width: 190, height: 18 },
+  { x: 1280, y: 690, width: 210, height: 18 },
+  { x: 1650, y: 630, width: 210, height: 18 },
+  { x: 2020, y: 570, width: 220, height: 18 },
+  { x: 2420, y: 650, width: 210, height: 18 },
+  { x: 2800, y: 590, width: 210, height: 18 },
+  { x: 3150, y: 690, width: 230, height: 18 },
+  { x: 3500, y: 630, width: 220, height: 18 },
+  { x: 3900, y: 570, width: 210, height: 18 },
+  { x: 4240, y: 690, width: 300, height: 18 }
+];
+const MANGUE_ROOM_1_WALLS = [
+  { x: 1160, y: 655, width: 48, height: 105 },
+  { x: 2260, y: 625, width: 52, height: 135 },
+  { x: 3390, y: 625, width: 50, height: 135 },
+  { x: 4050, y: 610, width: 42, height: 150 }
+];
+function makeMangueEnemy(room, type, x, patrolMin, patrolMax, opts = {}) {
+  return {
+    room,
+    type,
+    spawnX: x,
+    x,
+    y: 0,
+    width: opts.width || (type === "cururu" ? 54 : 44),
+    height: opts.height || (type === "cururu" ? 48 : 38),
+    maxHp: opts.maxHp || (type === "cururu" ? 130 : 80),
+    hp: opts.maxHp || (type === "cururu" ? 130 : 80),
+    alive: true,
+    patrolMin,
+    patrolMax,
+    patrolSpeed: opts.patrolSpeed || (type === "cururu" ? 42 : 70),
+    chaseSpeed: opts.chaseSpeed || (type === "cururu" ? 82 : 125),
+    detectionRange: opts.detectionRange || 300,
+    direction: Math.random() < 0.5 ? -1 : 1,
+    damage: opts.damage || (type === "cururu" ? 15 : 9),
+    attackCooldown: opts.attackCooldown || 0.85,
+    attackCooldownTimer: 0,
+    hurtTimer: 0,
+    hurtDuration: 0.12
+  };
+}
+const mangueEnemies = [
+  makeMangueEnemy(0, "caranguejo", 720,  610,  840),
+  makeMangueEnemy(0, "cururu",      1370, 1240, 1510),
+  makeMangueEnemy(0, "caranguejo", 2260, 2140, 2440),
+  makeMangueEnemy(0, "cururu",      2960, 2820, 3130),
+  makeMangueEnemy(0, "caranguejo", 3650, 3510, 3800),
+  makeMangueEnemy(0, "cururu",      4310, 4160, 4460),
+  makeMangueEnemy(1, "caranguejo", 900,  760, 1060),
+  makeMangueEnemy(1, "cururu",      1880, 1710, 2010),
+  makeMangueEnemy(1, "caranguejo", 3250, 3120, 3440)
+];
+function getExtraEnemies() {
+  return mangueEnemies.filter(e => e.room === currentRoom);
+}
+function resetMangueEnemies(room) {
+  for (const e of mangueEnemies) {
+    if (e.room !== room) continue;
+    e.x = e.spawnX;
+    e.y = ground.y - e.height;
+    e.hp = e.maxHp;
+    e.alive = true;
+    e.attackCooldownTimer = 0;
+    e.hurtTimer = 0;
+  }
+}
+function applyScenarioRoom(index) {
+  ground.width = WORLD_WIDTH;
+  if (index === 0) {
+    setRoomGeometry(
+      MANGUE_ROOM_0_PLATFORMS,
+      MANGUE_ROOM_0_WALLS
+    );
+    grapplePoint.x = 1970;
+    grapplePoint.y = 405;
+    grapplePoint.grabRange = 285;
+    waterFly.x = 1600;
+    waterFly.baseY = 525;
+    waterFly.y = waterFly.baseY;
+    waterFly.alive = !waterFly.collected;
+    windFly.alive = false;
+    enemy.type = "caranguejo";
+    enemy.x = 1040;
+    enemy.patrolMin = 920;
+    enemy.patrolMax = 1180;
+    enemy.patrolSpeed = 62;
+    enemy.chaseSpeed = 116;
+    enemy.detectionRange = 300;
+    enemy.damage = 10;
+    resetMangueEnemies(0);
+  } else {
+    setRoomGeometry(
+      MANGUE_ROOM_1_PLATFORMS,
+      MANGUE_ROOM_1_WALLS
+    );
+    grapplePoint.x = 2920;
+    grapplePoint.y = 410;
+    waterFly.alive = false;
+    windFly.x = 1700;
+    windFly.baseY = 590;
+    windFly.y = windFly.baseY;
+    windFly.alive = !windFly.collected;
+    enemy.type = "cururu";
+    enemy.x = 2500;
+    enemy.patrolMin = 2360;
+    enemy.patrolMax = 2670;
+    bossGate.x = 4040;
+    bossGate.y = 520;
+    boss.x = 4440;
+    boss.y = ground.y - boss.height;
+    boss.arenaLeft = 4070;
+    boss.arenaRight = 4770;
+    resetMangueEnemies(1);
+  }
+  rebuildSolids();
+  enemy.y = ground.y - enemy.height;
+  enemy.hp = enemy.maxHp;
+  enemy.alive = true;
+  enemy.attackCooldownTimer = 0;
+  enemy.hurtTimer = 0;
+}
+const __baseLoadRoom = loadRoom;
+loadRoom = function(index, entrySide = "left") {
+  __baseLoadRoom(index, entrySide);
+  applyScenarioRoom(index);
+  snapCameraToMac();
+};
+applyScenarioRoom(0);
+function updateOneMangueEnemy(e, dt) {
+  if (!e.alive) return;
+  if (e.hurtTimer > 0) e.hurtTimer -= dt;
+  if (e.attackCooldownTimer > 0) e.attackCooldownTimer -= dt;
+  e.y = ground.y - e.height;
+  const enemyCenter = e.x + e.width / 2;
+  const macCenter = mac.x + mac.width / 2;
+  const distance = Math.abs(macCenter - enemyCenter);
+  let speed = e.patrolSpeed;
+  if (!mac.dead && distance <= e.detectionRange) {
+    e.direction = macCenter < enemyCenter ? -1 : 1;
+    speed = e.chaseSpeed;
+  } else {
+    if (e.x <= e.patrolMin) e.direction = 1;
+    if (e.x + e.width >= e.patrolMax) e.direction = -1;
+  }
+  e.x += e.direction * speed * dt;
+  e.x = Math.max(
+    e.patrolMin,
+    Math.min(e.x, e.patrolMax - e.width)
+  );
+  if (mac.dead) return;
+  const hitbox = {
+    x: e.x,
+    y: e.y,
+    width: e.width,
+    height: e.height
+  };
+  if (
+    rectsOverlap(hitbox, getMacHitbox()) &&
+    e.attackCooldownTimer <= 0
+  ) {
+    damageMac(e.damage, e.x + e.width / 2);
+    e.attackCooldownTimer = e.attackCooldown;
+  }
+}
+updateEnemy = function(dt) {
+  updateOneMangueEnemy(enemy, dt);
+  for (const e of getExtraEnemies()) {
+    updateOneMangueEnemy(e, dt);
+  }
+};
+function damageExtraEnemy(e, amount) {
+  if (!e || !e.alive) return;
+  e.hp -= amount;
+  e.hurtTimer = e.hurtDuration;
+  if (e.hp <= 0) {
+    e.hp = 0;
+    e.alive = false;
+  }
+}
+function extraEnemyHitbox(e) {
+  return {
+    x: e.x,
+    y: e.y,
+    width: e.width,
+    height: e.height
+  };
+}
+function hitFirstExtra(hitbox, amount) {
+  if (!hitbox) return false;
+  for (const e of getExtraEnemies()) {
+    if (!e.alive) continue;
+    if (rectsOverlap(hitbox, extraEnemyHitbox(e))) {
+      damageExtraEnemy(e, amount);
+      return true;
+    }
+  }
+  return false;
+}
+function updateExtraEnemyCombat() {
+  if (
+    tongue.active &&
+    !grapple.active &&
+    !tongue.didHitEnemy
+  ) {
+    if (hitFirstExtra(getTongueHitbox(), 15)) {
+      tongue.didHitEnemy = true;
+    }
+  }
+  if (
+    normalAttack.active &&
+    normalAttack.hitboxActive &&
+    !normalAttack.didHitEnemy
+  ) {
+    if (hitFirstExtra(getNormalAttackHitbox(), 25)) {
+      normalAttack.didHitEnemy = true;
+    }
+  }
+  for (let i = waterShots.length - 1; i >= 0; i--) {
+    const shot = waterShots[i];
+    const hit = {
+      x: shot.x - shot.radius,
+      y: shot.y - shot.radius,
+      width: shot.radius * 2,
+      height: shot.radius * 2
+    };
+    if (hitFirstExtra(hit, 20)) {
+      waterShots.splice(i, 1);
+    }
+  }
+  if (
+    waterBurst.active &&
+    !waterBurst.didHitEnemy
+  ) {
+    if (hitFirstExtra(getWaterBurstHitbox(), 35)) {
+      waterBurst.didHitEnemy = true;
+    }
+  }
+  if (
+    waterUltimate.active &&
+    !waterUltimate.didHitEnemy
+  ) {
+    const hit = {
+      x: waterUltimate.waveX,
+      y: ground.y - waterUltimate.waveHeight,
+      width: waterUltimate.waveWidth,
+      height: waterUltimate.waveHeight
+    };
+    if (hitFirstExtra(hit, 60)) {
+      waterUltimate.didHitEnemy = true;
+    }
+  }
+  for (let i = windBlades.length - 1; i >= 0; i--) {
+    const blade = windBlades[i];
+    const hit = {
+      x: blade.x,
+      y: blade.y,
+      width: blade.width,
+      height: blade.height
+    };
+    if (hitFirstExtra(hit, 20)) {
+      windBlades.splice(i, 1);
+    }
+  }
+  if (
+    windGust.active &&
+    !windGust.didHitEnemy
+  ) {
+    if (hitFirstExtra(getWindGustHitbox(), 35)) {
+      windGust.didHitEnemy = true;
+    }
+  }
+  if (
+    windUltimate.active &&
+    windUltimate.timer >= windUltimate.spawnDelay &&
+    !windUltimate.didHitEnemy
+  ) {
+    const hit = {
+      x: windUltimate.x,
+      y: ground.y - windUltimate.height,
+      width: windUltimate.width,
+      height: windUltimate.height
+    };
+    if (hitFirstExtra(hit, 70)) {
+      windUltimate.didHitEnemy = true;
+    }
+  }
+}
+const __baseUpdate = update;
+update = function(dt) {
+  __baseUpdate(dt);
+  updateExtraEnemyCombat();
+};
+function drawMangroveBackground() {
+  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+  sky.addColorStop(0, "#8bc3d5");
+  sky.addColorStop(0.50, "#bfd9c5");
+  sky.addColorStop(1, "#91a87e");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = "#fff3c4";
+  ctx.beginPath();
+  ctx.arc(WIDTH * 0.72, 110, 72, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  const px1 = -((camera.x * 0.10) % 520);
+  const px2 = -((camera.x * 0.22) % 410);
+  ctx.fillStyle = "rgba(69,108,83,0.30)";
+  for (let i = -1; i < Math.ceil(WIDTH / 360) + 2; i++) {
+    const x = px1 + i * 360;
+    ctx.beginPath();
+    ctx.moveTo(x, HEIGHT * 0.60);
+    ctx.quadraticCurveTo(x + 90, HEIGHT * 0.31, x + 190, HEIGHT * 0.56);
+    ctx.quadraticCurveTo(x + 270, HEIGHT * 0.36, x + 370, HEIGHT * 0.60);
+    ctx.lineTo(x + 370, HEIGHT * 0.72);
+    ctx.lineTo(x, HEIGHT * 0.72);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = "rgba(50,84,63,0.40)";
+  ctx.fillStyle = "rgba(50,84,63,0.34)";
+  ctx.lineWidth = 5;
+  for (let i = -1; i < Math.ceil(WIDTH / 210) + 2; i++) {
+    const x = px2 + i * 210 + 70;
+    const base = HEIGHT * 0.68;
+    const top = HEIGHT * (0.33 + (i % 3) * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.quadraticCurveTo(x - 14, (base + top) / 2, x, top);
+    ctx.stroke();
+    for (let a = -2; a <= 2; a++) {
+      ctx.beginPath();
+      ctx.moveTo(x, top + 4);
+      ctx.quadraticCurveTo(x + a * 22, top - 18, x + a * 38, top + 12);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = "rgba(91,100,83,0.30)";
+  const ruinX = WIDTH * 0.68 - (camera.x * 0.07 % 250);
+  ctx.fillRect(ruinX, HEIGHT * 0.38, 34, HEIGHT * 0.22);
+  ctx.fillRect(ruinX + 74, HEIGHT * 0.34, 34, HEIGHT * 0.26);
+  ctx.fillRect(ruinX + 26, HEIGHT * 0.47, 58, HEIGHT * 0.13);
+  const waterY = HEIGHT * 0.67;
+  ctx.fillStyle = "rgba(93,174,174,0.34)";
+  ctx.fillRect(0, waterY, WIDTH, HEIGHT - waterY);
+  ctx.strokeStyle = "rgba(231,247,218,0.28)";
+  ctx.lineWidth = 2;
+  for (let y = waterY + 16; y < HEIGHT; y += 26) {
+    const offset = (camera.x * 0.15 + y * 0.7) % 90;
+    for (let x = -90; x < WIDTH + 90; x += 110) {
+      ctx.beginPath();
+      ctx.moveTo(x - offset, y);
+      ctx.quadraticCurveTo(x + 24 - offset, y - 3, x + 56 - offset, y);
+      ctx.stroke();
+    }
+  }
+}
+function drawStoneBlocks(rect, wall = false) {
+  const top = wall ? "#76755d" : "#85846b";
+  const side = wall ? "#555845" : "#62634d";
+  ctx.fillStyle = side;
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fillStyle = top;
+  ctx.fillRect(rect.x, rect.y, rect.width, Math.min(8, rect.height));
+  ctx.strokeStyle = "rgba(46,50,39,0.32)";
+  ctx.lineWidth = 1;
+  const blockH = 16;
+  const blockW = 34;
+  for (let yy = rect.y + 8; yy < rect.y + rect.height; yy += blockH) {
+    const row = Math.floor((yy - rect.y) / blockH);
+    for (let xx = rect.x + (row % 2 ? -17 : 0); xx < rect.x + rect.width; xx += blockW) {
+      ctx.strokeRect(xx, yy, blockW, blockH);
+    }
+  }
+  ctx.fillStyle = "#68864b";
+  for (let x = rect.x + 4; x < rect.x + rect.width - 3; x += 18) {
+    const h = 3 + ((x * 7) % 7);
+    ctx.fillRect(x, rect.y - 2, 14, 4);
+    if ((x / 18) % 3 < 1) {
+      ctx.fillRect(x + 4, rect.y + 2, 3, h);
+    }
+  }
+}
+function drawMangroveWorldDecor() {
+  if (currentRoom !== 0) return;
+  ctx.save();
+  ctx.strokeStyle = "#4c4b36";
+  ctx.lineCap = "round";
+  const rootZones = [
+    90, 1180, 2380, 3440, 4550
+  ];
+  for (const rootX of rootZones) {
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.moveTo(rootX, ground.y + 20);
+    ctx.bezierCurveTo(
+      rootX - 70, ground.y - 70,
+      rootX + 50, ground.y - 170,
+      rootX + 24, ground.y - 280
+    );
+    ctx.stroke();
+    ctx.lineWidth = 8;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(rootX, ground.y - 20 - i * 18);
+      ctx.quadraticCurveTo(
+        rootX + (i - 1) * 58,
+        ground.y - 45 - i * 12,
+        rootX + (i - 1) * 95,
+        ground.y
+      );
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  const arches = [520, 2050, 3070, 4380];
+  for (const x of arches) {
+    ctx.fillStyle = "rgba(93,93,72,0.78)";
+    ctx.fillRect(x, 535, 26, 225);
+    ctx.fillRect(x + 118, 555, 25, 205);
+    ctx.strokeStyle = "rgba(109,108,82,0.85)";
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.arc(x + 72, 585, 59, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+  const plants = [
+    [410, 688], [1010, 578], [1660, 612], [2290, 688],
+    [2930, 573], [3650, 628], [4250, 678], [4570, 613]
+  ];
+  for (const [x, y] of plants) {
+    ctx.save();
+    ctx.translate(x, y);
+    for (let i = -2; i <= 2; i++) {
+      ctx.strokeStyle = i === 0 ? "#b56546" : "#47713f";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(i * 7, -14, i * 12, -27 - Math.abs(i) * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+drawWorldGeometry = function() {
+  ctx.fillStyle = currentRoom === 0 ? "#5a5f45" : "#5c5c5c";
+  ctx.fillRect(
+    ground.x,
+    ground.y,
+    ground.width,
+    ground.height
+  );
+  if (currentRoom === 0) {
+    ctx.fillStyle = "#6e8750";
+    ctx.fillRect(ground.x, ground.y, ground.width, 8);
+  }
+  for (const platform of platforms) {
+    if (currentRoom === 0) {
+      drawStoneBlocks(platform, false);
+    } else {
+      ctx.fillStyle = "#777777";
+      ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    }
+  }
+  for (const wall of walls) {
+    if (currentRoom === 0) {
+      drawStoneBlocks(wall, true);
+    } else {
+      ctx.fillStyle = "#595959";
+      ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+    }
+  }
+  if (DEBUG_HITBOX) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    for (const solid of solids) {
+      ctx.strokeRect(solid.x, solid.y, solid.width, solid.height);
+    }
+    ctx.restore();
+  }
+};
+function drawMangueEnemy(e) {
+  if (!e.alive) return;
+  const hurt = e.hurtTimer > 0;
+  const cx = e.x + e.width / 2;
+  const cy = e.y + e.height / 2;
+  ctx.save();
+  if (e.type === "cururu") {
+    ctx.fillStyle = hurt ? "#e6b0a8" : "#756d43";
+    ctx.beginPath();
+    ctx.ellipse(cx, e.y + e.height * 0.62, e.width * 0.48, e.height * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = hurt ? "#f5c3ba" : "#8f8750";
+    ctx.beginPath();
+    ctx.ellipse(cx, e.y + 14, e.width * 0.34, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#eadb9e";
+    ctx.beginPath();
+    ctx.arc(cx - 10, e.y + 8, 4, 0, Math.PI * 2);
+    ctx.arc(cx + 10, e.y + 8, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#20261e";
+    ctx.beginPath();
+    ctx.arc(cx - 10, e.y + 8, 1.8, 0, Math.PI * 2);
+    ctx.arc(cx + 10, e.y + 8, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = hurt ? "#f2a8a1" : "#b85e3f";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 5, e.width * 0.40, e.height * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hurt ? "#ffd1cc" : "#873d31";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dir * 12, cy + 7);
+      ctx.lineTo(cx + dir * 24, cy + 16);
+      ctx.lineTo(cx + dir * 31, cy + 12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + dir * 12, cy + 2);
+      ctx.lineTo(cx + dir * 25, cy - 8);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#f4dca0";
+    ctx.beginPath();
+    ctx.arc(cx - 8, cy - 7, 3, 0, Math.PI * 2);
+    ctx.arc(cx + 8, cy - 7, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const hpRatio = Math.max(0, e.hp / e.maxHp);
+  ctx.fillStyle = "rgba(35,42,31,0.75)";
+  ctx.fillRect(e.x, e.y - 9, e.width, 4);
+  ctx.fillStyle = e.type === "cururu" ? "#d2b861" : "#e8835f";
+  ctx.fillRect(e.x, e.y - 9, e.width * hpRatio, 4);
+  if (DEBUG_HITBOX) {
+    ctx.strokeStyle = "#ffe082";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(e.x, e.y, e.width, e.height);
+  }
+  ctx.restore();
+}
+drawEnemy = function() {
+  drawMangueEnemy(enemy);
+  for (const e of getExtraEnemies()) {
+    drawMangueEnemy(e);
+  }
+};
+draw = function() {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  if (currentRoom === 0) {
+    drawMangroveBackground();
+  } else {
+    ctx.fillStyle = "#1b1b1b";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  }
+  ctx.save();
+  ctx.translate(
+    -Math.round(camera.x),
+    -Math.round(camera.y)
+  );
+  drawMangroveWorldDecor();
+  drawWorldGeometry();
+  drawBossGate();
+  drawRoomExit();
+  drawCheckpoint();
+  drawGrapplePoint();
+  drawWaterFly();
+  drawWindFly();
+  drawGrappleRope();
+  drawTongue();
+  drawNormalAttack();
+  drawWaterShots();
+  drawWaterBurst();
+  drawWaterUltimate();
+  drawWindBlades();
+  drawWindGust();
+  drawWindUltimate();
+  drawEnemy();
+  drawBoss();
+  drawMacGroundShadow();
+  if (!mac.dead) {
+    const blink =
+      mac.invulnerableTimer > 0 &&
+      Math.floor(mac.invulnerableTimer * 18) % 2 === 0;
+    if (!blink) {
+      drawMacSprite();
+    }
+    drawMacHitbox();
+  }
+  drawTongueHitbox();
+  ctx.restore();
+  drawHUD();
+};
