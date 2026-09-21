@@ -97,8 +97,7 @@ const AREA1 = {
       { x: 510,  y: 580, width: 50, height: 180 },
       { x: 1630, y: 600, width: 50, height: 160 },
       { x: 2320, y: 560, width: 52, height: 200 },
-      { x: 3300, y: 590, width: 52, height: 170 },
-      { x: 4040, y: 520, width: 34, height: 240 }
+      { x: 3300, y: 590, width: 52, height: 170 }
     ],
     anchors: [
       { id: "m1_a1", x: 1295, y: 455, radius: 12, grabRange: 335, kind: "chainroot" },
