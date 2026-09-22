@@ -1,23 +1,27 @@
-# Asset credits
+# Asset notes
 
-The following external assets are used in the Mangue das Ruínas scene.
+## Active Room 1 graphics
 
-## Classical Ruin Tiles
-- Author: surt
-- Source: https://opengameart.org/content/classical-ruin-tiles
-- License: CC0 1.0
-- Used for ruin architecture and background landmarks.
+The current Manguezal das Ruínas V4 no longer loads the large external OpenGameArt sheets at runtime.
 
-## Pixel platformer tile set
-- Author: Neburov
-- Source: https://opengameart.org/content/pixel-platformer-tile-set
-- License: CC0 1.0
-- Used for stone, wood, foliage, props and platform texture.
+Room 1 uses two small local atlases stored as base64 text:
+- `assets/room1_tiles.b64`
+- `assets/room1_landmarks.b64`
 
-## TileSet 2D Platformer [32x32]
-- Author: Kthulhu1947
-- Source: https://opengameart.org/content/tileset-2d-platformer-32x32
-- License: CC0 1.0
-- Used as damp terrain texture.
+They are cached into static canvas layers so tile rendering is not repeated every frame.
 
-All three source pages state CC0/public-domain style usage. Attribution is kept here for provenance.
+## References evaluated during the redesign
+
+The following resources were researched as references, but are not loaded by the current V4 runtime:
+
+- CraftPix / Free Game Assets — Free Swamp 2D Tileset Pixel Art
+  https://free-game-assets.itch.io/free-swamp-2d-tileset-pixel-art
+
+- egordorichev — Adve (CC0)
+  https://egordorichev.itch.io/adve
+
+- VEXED — Paper Pixels / Swamp biome (CC0)
+  https://v3x3d.itch.io/paper-pixels
+
+- Gurigraphics — Free platformer tileset (CC0)
+  https://gurigraphics.itch.io/free-tileset-platformer
