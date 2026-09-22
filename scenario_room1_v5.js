@@ -1077,3 +1077,271 @@ function a1DrawBlockedExit(ex) {
   const room = a1CurrentRoom();
   ctx.save();
   ctx.fillStyle = "rgba(35,150,173,.46)";
+  ctx.strokeStyle = "rgba(151,239,240,.70)";
+  ctx.lineWidth = 3;
+
+  if (ex.side === "right") {
+    const x = room.width - 46;
+    ctx.fillRect(x, ex.from, 46, ex.to - ex.from);
+    ctx.strokeRect(x, ex.from, 46, ex.to - ex.from);
+  } else if (ex.side === "left") {
+    ctx.fillRect(0, ex.from, 46, ex.to - ex.from);
+    ctx.strokeRect(0, ex.from, 46, ex.to - ex.from);
+  }
+
+  ctx.restore();
+}
+
+function a1DrawAnchors() {
+  const room = a1CurrentRoom();
+  const origin = getTongueOrigin();
+
+  for (const a of room.anchors || []) {
+    const d = distance(origin.x, origin.y, a.x, a.y);
+    const reachable = d <= a.grabRange && tongueLineClearToPoint(a.x, a.y);
+
+    ctx.save();
+    ctx.strokeStyle = a.kind === "chain" ? "#584f46" : (a.kind === "vine" ? "#3d684d" : "#5a3c26");
+    ctx.lineWidth = a.kind === "chain" ? 5 : 8;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y - 68);
+    ctx.quadraticCurveTo(a.x - 10, a.y - 30, a.x, a.y);
+    ctx.stroke();
+
+    ctx.fillStyle = reachable ? "#d4e997" : "#74895e";
+    ctx.beginPath();
+    ctx.ellipse(a.x, a.y, 11, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function a1DrawEnemy(e) {
+  if (!e.alive) return;
+  const flip = e.dir < 0;
+  const hurt = e.hurtTimer > 0;
+  const frame = e.frame % 4;
+
+  ctx.save();
+  if (hurt) ctx.globalAlpha = 0.55;
+
+  if (e.type === "thing") {
+    if (!a1DrawFrame(A1.assets.thing, frame, 33, 45, e.x - 5, e.y - 15, 2, flip, 1)) {
+      ctx.fillStyle = "#526b47"; ctx.fillRect(e.x, e.y, e.w, e.h);
+    }
+  } else if (e.type === "ghost") {
+    if (!a1DrawFrame(A1.assets.ghost, frame, 31, 44, e.x - 5, e.y - 10, 2, flip, .78)) {
+      ctx.fillStyle = "rgba(182,157,222,.7)"; ctx.fillRect(e.x, e.y, e.w, e.h);
+    }
+  } else {
+    if (!a1DrawFrame(A1.assets.spider, frame, 32, 21, e.x - 4, e.y - 8, 2, flip, 1)) {
+      ctx.fillStyle = "#784b3b"; ctx.fillRect(e.x, e.y, e.w, e.h);
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  const hp = Math.max(0, e.hp / e.maxHp);
+  ctx.fillStyle = "rgba(8,12,12,.75)";
+  ctx.fillRect(e.x, e.y - 9, e.w, 4);
+  ctx.fillStyle = "#b26d60";
+  ctx.fillRect(e.x, e.y - 9, e.w * hp, 4);
+  ctx.restore();
+}
+
+const __a1BaseDrawEnemy = drawEnemy;
+drawEnemy = function() {
+  if (currentRoom !== 0) {
+    __a1BaseDrawEnemy();
+    return;
+  }
+  for (const e of A1.enemies) a1DrawEnemy(e);
+};
+
+const __a1BaseDrawGrapple = drawGrapplePoint;
+drawGrapplePoint = function() {
+  if (currentRoom !== 0) {
+    __a1BaseDrawGrapple();
+    return;
+  }
+  a1DrawAnchors();
+};
+
+const __a1BaseDrawCheckpoint = drawCheckpoint;
+drawCheckpoint = function() {
+  if (currentRoom !== 0) {
+    __a1BaseDrawCheckpoint();
+    return;
+  }
+  const room = a1CurrentRoom();
+  if (!room.checkpoint) return;
+
+  const cp = checkpoints[0];
+  const active = currentCheckpointId === cp.id;
+  ctx.save();
+  ctx.fillStyle = "#253c36";
+  ctx.fillRect(cp.x - 16, cp.y + 18, 58, 52);
+  ctx.fillStyle = active ? "#7de6ac" : "#d6bb68";
+  ctx.fillRect(cp.x + 4, cp.y + 5, 18, 24);
+  const glow = ctx.createRadialGradient(cp.x + 13, cp.y + 16, 3, cp.x + 13, cp.y + 16, 55);
+  glow.addColorStop(0, active ? "rgba(125,230,172,.28)" : "rgba(214,187,104,.24)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(cp.x - 45, cp.y - 40, 120, 120);
+  ctx.restore();
+};
+
+function a1DrawExitCue(ex) {
+  const room = a1CurrentRoom();
+  const unlocked = a1CanUseExit(ex);
+  ctx.save();
+  ctx.globalAlpha = unlocked ? .62 : .28;
+  ctx.strokeStyle = unlocked ? "#88bfa8" : "#4d7f87";
+  ctx.lineWidth = 3;
+
+  if (ex.side === "left" || ex.side === "right") {
+    const x = ex.side === "left" ? 16 : room.width - 34;
+    const y = Math.max(120, Math.min(650, (ex.from + ex.to) / 2 - 54));
+    ctx.strokeRect(x, y, 18, 108);
+  } else {
+    const x = Math.max(30, Math.min(room.width - 70, (ex.from + ex.to) / 2 - 20));
+    const y = ex.side === "top" ? 34 : 710;
+    ctx.strokeRect(x, y, 40, 18);
+  }
+  ctx.restore();
+}
+
+const __a1BaseDrawRoomExit = drawRoomExit;
+drawRoomExit = function() {
+  if (currentRoom !== 0) {
+    __a1BaseDrawRoomExit();
+    return;
+  }
+  for (const ex of a1CurrentRoom().exits || []) {
+    a1DrawExitCue(ex);
+    a1DrawBlockedExit(ex);
+  }
+};
+
+function a1DrawMap() {
+  const nodes = Object.entries(A1.rooms);
+  const minX = 0, maxX = 5, minY = 3, maxY = 6;
+  const cellW = 18, cellH = 12;
+  const mapW = (maxX - minX + 1) * cellW + 18;
+  const mapH = (maxY - minY + 1) * cellH + 18;
+  const x0 = WIDTH - mapW - 16;
+  const y0 = 76;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,10,13,.68)";
+  ctx.fillRect(x0, y0, mapW, mapH);
+  ctx.strokeStyle = "rgba(170,200,190,.35)";
+  ctx.strokeRect(x0, y0, mapW, mapH);
+
+  for (const [id, room] of nodes) {
+    if (!A1.discovered.has(id) && id !== A1.node) continue;
+    const [mx,my] = room.map;
+    const x = x0 + 9 + (mx-minX)*cellW;
+    const y = y0 + 9 + (my-minY)*cellH;
+    ctx.fillStyle = A1.zoneColors[room.zone];
+    ctx.globalAlpha = id === A1.node ? 1 : .52;
+    ctx.fillRect(x, y, 14, 8);
+    if (id === A1.node) {
+      ctx.strokeStyle = "#f4e4ad";
+      ctx.strokeRect(x-1,y-1,16,10);
+    }
+  }
+  ctx.restore();
+}
+
+const __a1BaseDrawHUD = drawHUD;
+drawHUD = function() {
+  __a1BaseDrawHUD();
+  if (currentRoom === 0) a1DrawMap();
+};
+
+function a1DrawForeground() {
+  ctx.save();
+  ctx.globalAlpha = .60;
+  ctx.strokeStyle = "#06120f";
+  ctx.lineCap = "round";
+  const offset = -((camera.x * .035) % 260);
+  for (let i=-1;i<7;i++) {
+    const x = offset + i*245;
+    ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.moveTo(x, HEIGHT+20); ctx.quadraticCurveTo(x-30,HEIGHT-100,x+10,HEIGHT-210); ctx.stroke();
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(x,HEIGHT-95); ctx.lineTo(x-58,HEIGHT-135); ctx.moveTo(x+8,HEIGHT-82); ctx.lineTo(x+68,HEIGHT-122); ctx.stroke();
+  }
+  ctx.restore();
+
+  const v = ctx.createRadialGradient(WIDTH/2,HEIGHT/2,HEIGHT*.35,WIDTH/2,HEIGHT/2,WIDTH*.78);
+  v.addColorStop(0,"rgba(0,0,0,0)");
+  v.addColorStop(1,"rgba(0,7,9,.34)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0,0,WIDTH,HEIGHT);
+}
+
+const __a1BaseDraw = draw;
+draw = function() {
+  if (currentRoom !== 0) {
+    __a1BaseDraw();
+    return;
+  }
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+  a1DrawParallax();
+
+  ctx.save();
+  ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+  if (A1.roomCacheDirty) a1BuildRoomCache();
+  if (A1.roomCache) {
+    const sx = Math.max(0, Math.floor(camera.x));
+    const sy = Math.max(0, Math.floor(camera.y));
+    const sw = Math.min(WIDTH + 64, A1.roomCache.width - sx);
+    const sh = Math.min(HEIGHT + 64, A1.roomCache.height - sy);
+    if (sw > 0 && sh > 0) {
+      ctx.drawImage(
+        A1.roomCache,
+        sx, sy, sw, sh,
+        sx, sy, sw, sh
+      );
+    }
+  }
+
+  a1DrawWater(a1CurrentRoom());
+  drawRoomExit();
+  drawCheckpoint();
+  drawGrapplePoint();
+  drawWaterFly();
+  drawGrappleRope();
+  drawTongue();
+  drawNormalAttack();
+  drawWaterShots();
+  drawWaterBurst();
+  drawWaterUltimate();
+  drawWindBlades();
+  drawWindGust();
+  drawWindUltimate();
+  drawEnemy();
+  drawMacGroundShadow();
+
+  if (!mac.dead) {
+    const blink = mac.invulnerableTimer > 0 && Math.floor(mac.invulnerableTimer * 18) % 2 === 0;
+    if (!blink) drawMacSprite();
+    drawMacHitbox();
+  }
+
+  drawTongueHitbox();
+  ctx.restore();
+
+  a1DrawForeground();
+  drawHUD();
+};
+
+// Initial clean Area 1 load.
+A1.node = "entrada";
+a1LoadNode("entrada", "left", false);
