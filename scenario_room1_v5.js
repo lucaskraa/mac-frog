@@ -538,3 +538,273 @@ function a1LoadNode(nodeId, entryDir = "left", preserveMac = false) {
   A1.entryDir = entryDir;
   A1.roomWidth = room.width;
   A1.discovered.add(nodeId);
+  A1.transitionCooldown = 0.32;
+  A1.roomCacheDirty = true;
+
+  roomNames[0] = "Área 1 - " + room.name;
+  a1RoomGeometry(room);
+  a1ResetEnemyList(room);
+
+  cancelMacActions();
+  waterShots.length = 0;
+  windBlades.length = 0;
+  waterBurst.active = false;
+  windGust.active = false;
+  waterUltimate.active = false;
+  windUltimate.active = false;
+
+  waterFly.alive = false;
+  windFly.alive = false;
+
+  if (room.waterFly && !waterFly.collected) {
+    waterFly.x = room.waterFly.x;
+    waterFly.baseX = room.waterFly.x;
+    waterFly.baseY = room.waterFly.y;
+    waterFly.y = room.waterFly.y;
+    waterFly.hoverTime = 0;
+    waterFly.alive = true;
+  }
+
+  // Single real checkpoint for Area 1, at the central blue hub.
+  if (room.checkpoint) {
+    checkpoints[0].x = A1.checkpointX;
+    checkpoints[0].y = 680;
+  } else {
+    checkpoints[0].x = -9999;
+    checkpoints[0].y = 680;
+  }
+
+  if (!preserveMac) {
+    const pos = a1EntryPosition(room, entryDir);
+    mac.x = pos.x;
+    mac.y = pos.y;
+    mac.vx = 0;
+    mac.vy = 0;
+    mac.height = mac.normalHeight;
+    mac.grounded = false;
+  }
+
+  camera.x = Math.max(0, Math.min(mac.x - WIDTH * 0.35, Math.max(0, room.width - WIDTH)));
+  camera.y = Math.max(0, Math.min(mac.y - HEIGHT * 0.50, Math.max(0, A1.roomHeight - HEIGHT)));
+
+  if (A1.roomCacheId !== nodeId) {
+    A1.roomCacheId = nodeId;
+    A1.roomCache = document.createElement("canvas");
+    A1.roomCache.width = room.width;
+    A1.roomCache.height = A1.roomHeight;
+    A1.roomCacheCtx = A1.roomCache.getContext("2d");
+    A1.roomCacheCtx.imageSmoothingEnabled = false;
+  }
+}
+
+function a1HasWater() {
+  return !!mac.waterPower;
+}
+
+function a1CanUseExit(exit) {
+  return !exit.requiresWater || a1HasWater();
+}
+
+function a1Transition(exit) {
+  if (!exit || A1.transitionCooldown > 0) return;
+
+  if (!a1CanUseExit(exit)) {
+    mac.vx *= -0.25;
+    mac.vy = Math.max(mac.vy, 0);
+    return;
+  }
+
+  if (exit.dest === "__NEXT_AREA__") {
+    __a1BaseLoadRoom(1, "left");
+    return;
+  }
+
+  const opposite = {
+    left: "right",
+    right: "left",
+    top: "bottom",
+    bottom: "top"
+  }[exit.side] || "left";
+
+  a1LoadNode(exit.dest, opposite, false);
+}
+
+function a1CheckTransitions(dt) {
+  if (currentRoom !== 0) return;
+  A1.transitionCooldown = Math.max(0, A1.transitionCooldown - dt);
+  if (A1.transitionCooldown > 0) return;
+
+  const room = a1CurrentRoom();
+  const cx = mac.x + mac.width / 2;
+  const cy = mac.y + mac.height / 2;
+
+  for (const ex of room.exits || []) {
+    if (ex.side === "right" && mac.x + mac.width >= room.width - 8 && cy >= ex.from && cy <= ex.to) {
+      a1Transition(ex); return;
+    }
+    if (ex.side === "left" && mac.x <= 8 && cy >= ex.from && cy <= ex.to) {
+      a1Transition(ex); return;
+    }
+    if (
+      ex.side === "top" &&
+      mac.y <= 175 &&
+      cx >= ex.from &&
+      cx <= ex.to &&
+      (keys["w"] || keys["arrowup"])
+    ) {
+      a1Transition(ex); return;
+    }
+    if (
+      ex.side === "bottom" &&
+      mac.grounded &&
+      cy >= 620 &&
+      cx >= ex.from &&
+      cx <= ex.to &&
+      (keys["s"] || keys["arrowdown"])
+    ) {
+      a1Transition(ex); return;
+    }
+  }
+}
+
+function a1ClampToRoom() {
+  if (currentRoom !== 0) return;
+  const room = a1CurrentRoom();
+  mac.x = Math.max(0, Math.min(mac.x, room.width - mac.width));
+}
+
+const __a1BaseUpdateCamera = updateCamera;
+updateCamera = function(dt) {
+  if (currentRoom !== 0) {
+    __a1BaseUpdateCamera(dt);
+    return;
+  }
+
+  const room = a1CurrentRoom();
+  const maxX = Math.max(0, room.width - WIDTH);
+  const maxY = Math.max(0, A1.roomHeight - HEIGHT);
+  const targetX = Math.max(0, Math.min(mac.x + mac.width / 2 - WIDTH / 2, maxX));
+  const targetY = Math.max(0, Math.min(mac.y + mac.height / 2 - HEIGHT / 2, maxY));
+  const f = Math.min(1, 7.5 * dt);
+  camera.x += (targetX - camera.x) * f;
+  camera.y += (targetY - camera.y) * f;
+};
+
+const __a1BaseSnapCamera = snapCameraToMac;
+snapCameraToMac = function() {
+  if (currentRoom !== 0) {
+    __a1BaseSnapCamera();
+    return;
+  }
+
+  const room = a1CurrentRoom();
+  camera.x = Math.max(0, Math.min(mac.x + mac.width / 2 - WIDTH / 2, Math.max(0, room.width - WIDTH)));
+  camera.y = Math.max(0, Math.min(mac.y + mac.height / 2 - HEIGHT / 2, Math.max(0, A1.roomHeight - HEIGHT)));
+};
+
+const __a1BaseLoadRoom = loadRoom;
+loadRoom = function(index, entrySide = "left") {
+  __a1BaseLoadRoom(index, entrySide);
+
+  if (index !== 0) return;
+
+  // Respawn at the hub if its checkpoint has been activated.
+  const node = respawnPoint.checkpointId === checkpoints[0].id
+    ? A1.checkpointNode
+    : "entrada";
+
+  a1LoadNode(node, entrySide === "right" ? "right" : "left", false);
+};
+
+const __a1BaseUpdateRoomTransition = updateRoomTransition;
+updateRoomTransition = function(dt) {
+  if (currentRoom === 0) {
+    a1CheckTransitions(dt);
+    return;
+  }
+  __a1BaseUpdateRoomTransition(dt);
+};
+
+// ----- Enemy system -----
+function a1EnemyHitbox(e) {
+  return { x:e.x, y:e.y, width:e.w, height:e.h };
+}
+
+function a1DamageEnemy(e, damage) {
+  if (!e || !e.alive) return;
+  e.hp -= damage;
+  e.hurtTimer = 0.12;
+  if (e.hp <= 0) {
+    e.hp = 0;
+    e.alive = false;
+  }
+}
+
+function a1HitFirst(hitbox, damage) {
+  if (!hitbox) return false;
+  for (const e of A1.enemies) {
+    if (!e.alive) continue;
+    if (rectsOverlap(hitbox, a1EnemyHitbox(e))) {
+      a1DamageEnemy(e, damage);
+      return true;
+    }
+  }
+  return false;
+}
+
+function a1UpdateCombatHits() {
+  if (currentRoom !== 0) return;
+
+  if (tongue.active && !grapple.active && !tongue.didHitEnemy) {
+    if (a1HitFirst(getTongueHitbox(), 15)) tongue.didHitEnemy = true;
+  }
+  if (normalAttack.active && normalAttack.hitboxActive && !normalAttack.didHitEnemy) {
+    if (a1HitFirst(getNormalAttackHitbox(), 25)) normalAttack.didHitEnemy = true;
+  }
+  for (let i = waterShots.length - 1; i >= 0; i--) {
+    const s = waterShots[i];
+    if (a1HitFirst({ x:s.x-s.radius, y:s.y-s.radius, width:s.radius*2, height:s.radius*2 }, 20)) {
+      waterShots.splice(i, 1);
+    }
+  }
+  if (waterBurst.active && !waterBurst.didHitEnemy && a1HitFirst(getWaterBurstHitbox(), 35)) {
+    waterBurst.didHitEnemy = true;
+  }
+  for (let i = windBlades.length - 1; i >= 0; i--) {
+    const b = windBlades[i];
+    if (a1HitFirst({ x:b.x, y:b.y, width:b.width, height:b.height }, 20)) windBlades.splice(i, 1);
+  }
+  if (windGust.active && !windGust.didHitEnemy && a1HitFirst(getWindGustHitbox(), 35)) {
+    windGust.didHitEnemy = true;
+  }
+}
+
+function a1UpdateEnemies(dt) {
+  if (currentRoom !== 0) return;
+
+  for (const e of A1.enemies) {
+    if (!e.alive) continue;
+    e.time += dt;
+    e.frameTimer += dt;
+    e.attackCooldown = Math.max(0, e.attackCooldown - dt);
+    e.hurtTimer = Math.max(0, e.hurtTimer - dt);
+
+    if (e.frameTimer >= 0.14) {
+      e.frameTimer = 0;
+      e.frame = (e.frame + 1) % 4;
+    }
+
+    const mx = mac.x + mac.width / 2;
+    const my = mac.y + mac.height / 2;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dx = mx - ex;
+    const dy = my - ey;
+    const dist = Math.hypot(dx, dy);
+
+    if (e.type === "ghost") {
+      if (dist < 330 && dist > 1) {
+        e.x += (dx / dist) * e.speed * dt;
+        e.y += (dy / dist) * e.speed * dt;
+      } else {
+        e.y = e.baseY + Math.sin(e.time * 2.1) * 20;
