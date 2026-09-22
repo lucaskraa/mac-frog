@@ -807,4 +807,273 @@ function a1UpdateEnemies(dt) {
         e.x += (dx / dist) * e.speed * dt;
         e.y += (dy / dist) * e.speed * dt;
       } else {
-        e.y = e.baseY + Math.sin(e.time * 2.1) * 20;
+        e.y = e.baseY + Math.sin(e.time * 2.1) * 20;        e.x += e.dir * 12 * dt;
+        if (e.x < e.min || e.x > e.max) e.dir *= -1;
+      }
+    } else {
+      const sameLevel = Math.abs(dy) < 110;
+      const chase = sameLevel && Math.abs(dx) < 285;
+      const speed = chase ? e.speed * 1.45 : e.speed;
+      e.dir = chase ? (dx >= 0 ? 1 : -1) : e.dir;
+      e.x += e.dir * speed * dt;
+      if (e.x <= e.min) { e.x = e.min; e.dir = 1; }
+      if (e.x + e.w >= e.max) { e.x = e.max - e.w; e.dir = -1; }
+      e.y = e.surfaceY - e.h;
+    }
+
+    if (!mac.dead && e.attackCooldown <= 0 && rectsOverlap(a1EnemyHitbox(e), getMacHitbox())) {
+      damageMac(e.damage, e.x + e.w / 2);
+      e.attackCooldown = 0.85;
+    }
+  }
+}
+
+const __a1BaseUpdateEnemy = updateEnemy;
+updateEnemy = function(dt) {
+  if (currentRoom !== 0) {
+    __a1BaseUpdateEnemy(dt);
+    return;
+  }
+  a1UpdateEnemies(dt);
+};
+
+const __a1BaseUpdate = update;
+update = function(dt) {
+  __a1BaseUpdate(dt);
+  if (currentRoom !== 0) return;
+  a1ClampToRoom();
+  a1UpdateCombatHits();
+
+  if (A1.lastWaterPower !== mac.waterPower) {
+    A1.lastWaterPower = mac.waterPower;
+    a1RoomGeometry(a1CurrentRoom());
+    A1.roomCacheDirty = true;
+  }
+
+  // loadSavedGame() restores the checkpoint id after calling loadRoom().
+  // Reconcile that ordering once, without moving the saved Mac position.
+  if (!A1.bootReconciled) {
+    A1.bootReconciled = true;
+
+    if (
+      currentCheckpointId === checkpoints[0].id &&
+      A1.node !== A1.checkpointNode
+    ) {
+      const savedX = mac.x;
+      const savedY = mac.y;
+
+      a1LoadNode(A1.checkpointNode, "left", true);
+
+      mac.x = savedX;
+      mac.y = savedY;
+      snapCameraToMac();
+    }
+  }
+};
+
+// ----- Grapple anchors -----
+function a1AnchorCandidate() {
+  const room = a1CurrentRoom();
+  const origin = getTongueOrigin();
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const a of room.anchors || []) {
+    const d = distance(origin.x, origin.y, a.x, a.y);
+    if (d > a.grabRange) continue;
+    if (!tongueLineClearToPoint(a.x, a.y)) continue;
+    const direction = a.x >= origin.x ? 1 : -1;
+    if (direction !== mac.facing && d > 180) continue;
+    const score = d + (a.y < origin.y ? -28 : 0);
+    if (score < bestScore) {
+      best = a;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+const __a1BaseCanGrabPoint = canGrabPoint;
+canGrabPoint = function() {
+  if (currentRoom !== 0) return __a1BaseCanGrabPoint();
+  if (grapple.active) return true;
+  const a = a1AnchorCandidate();
+  if (!a) return false;
+  grapplePoint.x = a.x;
+  grapplePoint.y = a.y;
+  grapplePoint.radius = 12;
+  grapplePoint.grabRange = a.grabRange;
+  return true;
+};
+
+// ----- Art helpers -----
+function a1DrawFrame(img, frame, fw, fh, x, y, scale = 2, flip = false, alpha = 1) {
+  if (!(img && img.complete && img.naturalWidth)) return false;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = false;
+  if (flip) {
+    ctx.translate(Math.round(x + fw * scale), Math.round(y));
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, frame * fw, 0, fw, fh, 0, 0, fw * scale, fh * scale);
+  } else {
+    ctx.drawImage(img, frame * fw, 0, fw, fh, Math.round(x), Math.round(y), fw * scale, fh * scale);
+  }
+  ctx.restore();
+  return true;
+}
+
+function a1Tile(ctx2, tileValue, x, y, scale = 3) {
+  const img = A1.assets.tileset;
+  if (!(img && img.complete && img.naturalWidth)) return false;
+  const idx = Math.max(0, tileValue - 1);
+  const sx = (idx % 21) * 16;
+  const sy = Math.floor(idx / 21) * 16;
+  ctx2.imageSmoothingEnabled = false;
+  ctx2.drawImage(img, sx, sy, 16, 16, Math.round(x), Math.round(y), 16 * scale, 16 * scale);
+  return true;
+}
+
+function a1DrawRectTiles(ctx2, rect, style = "stone") {
+  const tileScale = 3;
+  const ts = 16 * tileScale;
+  const topTile = style === "wood" ? 3 : 2;
+  const bodyTile = 1;
+
+  // One crisp surface row aligned to collision top.
+  for (let x = rect.x; x < rect.x + rect.width; x += ts) {
+    a1Tile(ctx2, topTile, x, rect.y - ts + 24, tileScale);
+  }
+
+  // Stone body only where the collision has real thickness.
+  const targetDepth = Math.max(rect.height, style === "wood" ? 24 : 72);
+  for (let y = rect.y + 12; y < rect.y + targetDepth; y += ts) {
+    for (let x = rect.x; x < rect.x + rect.width; x += ts) {
+      a1Tile(ctx2, bodyTile, x, y, tileScale);
+    }
+  }
+
+  if (style === "shrine" || style === "azulejo") {
+    ctx2.fillStyle = "rgba(43,151,164,.58)";
+    for (let x = rect.x + 12; x < rect.x + rect.width - 12; x += 32) {
+      ctx2.fillRect(x, rect.y + 4, 12, 4);
+    }
+  }
+}
+
+function a1DrawBackgroundLayer(img, speed, scale, yOffset = 0, alpha = 1) {
+  if (!(img && img.complete && img.naturalWidth)) return;
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  const scroll = (camera.x * speed) % dw;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = false;
+  for (let x = -scroll - dw; x < WIDTH + dw; x += dw) {
+    ctx.drawImage(img, Math.round(x), Math.round(HEIGHT - dh + yOffset), dw, dh);
+  }
+  ctx.restore();
+}
+
+function a1DrawParallax() {
+  ctx.fillStyle = "#071015";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  a1DrawBackgroundLayer(A1.assets.bg, 0.03, 3, 0, 1);
+  a1DrawBackgroundLayer(A1.assets.mid1, 0.12, 3, 0, 0.95);
+  a1DrawBackgroundLayer(A1.assets.mid2, 0.25, 3, 0, 0.92);
+  a1DrawBackgroundLayer(A1.assets.trees, 0.48, 3, 0, 0.92);
+
+  // Brazilian warm dawn accent without filtering the pixel assets.
+  const g = ctx.createRadialGradient(WIDTH * 0.72, HEIGHT * 0.28, 12, WIDTH * 0.72, HEIGHT * 0.28, 270);
+  g.addColorStop(0, "rgba(255,190,104,.16)");
+  g.addColorStop(1, "rgba(255,190,104,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(WIDTH * 0.45, 0, WIDTH * 0.5, HEIGHT * 0.65);
+}
+
+function a1DrawLandmark(ctx2, room) {
+  // Trees from the pack become room-specific landmarks; they are cached once.
+  if (!(A1.assets.trees && A1.assets.trees.complete && A1.assets.trees.naturalWidth)) return;
+  ctx2.save();
+  ctx2.imageSmoothingEnabled = false;
+
+  if (room.landmark === "giantTree") {
+    ctx2.globalAlpha = 0.92;
+    ctx2.drawImage(A1.assets.trees, 480, 80, 1150, 832);
+    ctx2.drawImage(A1.assets.trees, 1030, 10, 900, 650);
+  } else if (room.landmark === "chapel" || room.landmark === "cloister" || room.landmark === "tower") {
+    ctx2.globalAlpha = 0.38;
+    ctx2.drawImage(A1.assets.mid2, 220, 100, 624, 768);
+    ctx2.drawImage(A1.assets.mid1, room.width - 760, 70, 624, 768);
+  } else if (room.landmark === "shrine") {
+    ctx2.globalAlpha = 0.32;
+    ctx2.drawImage(A1.assets.mid1, 310, 40, 832, 820);
+  } else if (room.landmark === "aqueduct") {
+    ctx2.globalAlpha = 0.36;
+    ctx2.drawImage(A1.assets.mid2, 120, 90, 1100, 830);
+  } else {
+    ctx2.globalAlpha = 0.24;
+    ctx2.drawImage(A1.assets.mid1, 140, 100, 624, 768);
+  }
+
+  ctx2.restore();
+}
+
+function a1BuildRoomCache() {
+  const room = a1CurrentRoom();
+  if (!A1.roomCache || A1.roomCacheId !== A1.node) return;
+  const c = A1.roomCacheCtx;
+  c.clearRect(0, 0, A1.roomCache.width, A1.roomCache.height);
+  c.imageSmoothingEnabled = false;
+
+  a1DrawLandmark(c, room);
+
+  // Floor segments get real tiles; only static geometry is cached.
+  for (const f of room.floors || []) {
+    c.fillStyle = "#102026";
+    c.fillRect(f.x, f.y, f.width, f.height);
+    a1DrawRectTiles(c, { x:f.x, y:f.y, width:f.width, height:90 }, "moss");
+  }
+
+  for (const plat of room.platforms || []) a1DrawRectTiles(c, plat, plat.style);
+  for (const w of room.walls || []) a1DrawRectTiles(c, w, "stone");
+
+  // Room-specific architecture: doors, cell bars, shrine plinths, etc.
+  c.strokeStyle = "rgba(74,94,91,.85)";
+  c.lineWidth = 7;
+  if (["prison","chapel","cloister","gate"].includes(room.landmark)) {
+    for (let x = 260; x < room.width - 200; x += 420) {
+      c.strokeRect(x, 250, 180, 280);
+      for (let bx = x + 20; bx < x + 180; bx += 30) {
+        c.beginPath(); c.moveTo(bx, 250); c.lineTo(bx, 530); c.stroke();
+      }
+    }
+  }
+
+  A1.roomCacheDirty = false;
+}
+
+function a1DrawWater(room) {
+  const t = performance.now() * 0.001;
+  for (const pit of room.pits || []) {
+    ctx.fillStyle = "#0b3b49";
+    ctx.fillRect(pit.x, 760, pit.width, 140);
+    ctx.fillStyle = "rgba(41,126,136,.42)";
+    ctx.fillRect(pit.x, 760, pit.width, 44);
+    ctx.fillStyle = "rgba(172,236,226,.42)";
+    ctx.fillRect(pit.x, 760, pit.width, 3);
+    for (let y = 780; y < 900; y += 28) {
+      const phase = Math.round(Math.sin(t * 1.5 + y * .03) * 9);
+      for (let x = pit.x + 10; x < pit.x + pit.width - 20; x += 64) {
+        ctx.fillRect(x + phase, y, 28, 2);
+      }
+    }
+  }
+}
+
+function a1DrawBlockedExit(ex) {
+  if (!ex.requiresWater || mac.waterPower) return;
+  const room = a1CurrentRoom();
+  ctx.save();
+  ctx.fillStyle = "rgba(35,150,173,.46)";
