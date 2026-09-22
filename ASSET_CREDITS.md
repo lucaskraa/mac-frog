@@ -1,27 +1,20 @@
-# Asset notes
+# Asset credits and design references
 
-## Active Room 1 graphics
+## Active Area 1 art
 
-The current Manguezal das Ruínas V4 no longer loads the large external OpenGameArt sheets at runtime.
+### GothicVania Swamp
+- Artist: Ansimuz / Luis Zuno
+- Original source: https://opengameart.org/content/gotthicvania-swamp
+- License: CC0 1.0 / public domain
+- Used for the active Area 1 tileset, 4-layer swamp parallax and animated swamp enemies.
+- Local runtime copies are stored in `assets/gothicvania-swamp/*.b64` so gameplay does not depend on external HTTP image loading.
 
-Room 1 uses two small local atlases stored as base64 text:
-- `assets/room1_tiles.b64`
-- `assets/room1_landmarks.b64`
+## Level-design reference
 
-They are cached into static canvas layers so tile rendering is not repeated every frame.
+### Dead Cells — hybrid level design
+- Reference: https://deepnight.net/tutorial/the-level-design-of-dead-cells-a-hybrid-approach/
+- Used only as a design reference for the fixed world graph + handmade room/chunk approach.
+- No Dead Cells artwork or game assets are included.
 
-## References evaluated during the redesign
-
-The following resources were researched as references, but are not loaded by the current V4 runtime:
-
-- CraftPix / Free Game Assets — Free Swamp 2D Tileset Pixel Art
-  https://free-game-assets.itch.io/free-swamp-2d-tileset-pixel-art
-
-- egordorichev — Adve (CC0)
-  https://egordorichev.itch.io/adve
-
-- VEXED — Paper Pixels / Swamp biome (CC0)
-  https://v3x3d.itch.io/paper-pixels
-
-- Gurigraphics — Free platformer tileset (CC0)
-  https://gurigraphics.itch.io/free-tileset-platformer
+## Notes
+The older external OpenGameArt runtime sheets and the experimental generated Room 1 atlases are no longer used by the active Area 1 V5.
