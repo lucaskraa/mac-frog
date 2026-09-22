@@ -18,12 +18,12 @@
     const [gameResponse, patchResponse, roomV2Response] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
       fetch('./cenario1.txt', {cache:'no-store'}),
-      fetch('./scenario_room1_v2.js', {cache:'no-store'})
+      fetch('./scenario_room1_v5.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
     if (!patchResponse.ok) throw new Error('cenario1.txt não carregou');
-    if (!roomV2Response.ok) throw new Error('scenario_room1_v2.js não carregou');
+    if (!roomV2Response.ok) throw new Error('scenario_room1_v5.js não carregou');
 
     let game = await gameResponse.text();
     const patch = await patchResponse.text();
