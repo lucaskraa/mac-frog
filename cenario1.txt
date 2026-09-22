@@ -1,2 +1,2 @@
 // Legacy Area 1 patch disabled.
-// Active implementation: scenario_room1_v2.js
+// Active implementation: scenario_room1_v5.js
