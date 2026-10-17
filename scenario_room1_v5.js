@@ -544,6 +544,9 @@ function a1LoadNode(nodeId, entryDir = "left", preserveMac = false) {
   roomNames[0] = "Área 1 - " + room.name;
   a1RoomGeometry(room);
   a1ResetEnemyList(room);
+  A1.particles = a1MakeParticles(room, nodeId);
+  A1.shafts = a1MakeShafts(room, nodeId);
+  A1.fgItems = a1MakeForeground(room, nodeId);
 
   cancelMacActions();
   waterShots.length = 0;
@@ -839,6 +842,7 @@ updateEnemy = function(dt) {
 
 const __a1BaseUpdate = update;
 update = function(dt) {
+  if (currentRoom === 0 && A1.fullMap) return;
   __a1BaseUpdate(dt);
   if (currentRoom !== 0) return;
   a1ClampToRoom();
@@ -975,21 +979,239 @@ function a1DrawBackgroundLayer(img, speed, scale, yOffset = 0, alpha = 1) {
   ctx.restore();
 }
 
+// ----- Metroidvania atmosphere (Hollow Knight / Dead Cells inspired) -----
+A1.palette = {
+  red:    { fog: "#22130f", light: "255,176,122", tint: "#c7a596", map: "#7a3d33", label: "Mangue Rubro" },
+  blue:   { fog: "#0c1826", light: "140,200,255", tint: "#9db2cc", map: "#2e4f7c", label: "Águas Profundas" },
+  green:  { fog: "#0d1d16", light: "188,240,168", tint: "#a2bea2", map: "#33653d", label: "Bosque Ancestral" },
+  purple: { fog: "#1a1224", light: "214,170,255", tint: "#b1a0c6", map: "#5a3a72", label: "Ruínas Sombrias" }
+};
+A1.fullMap = false;
+A1.particles = [];
+A1.shafts = [];
+A1.fgItems = [];
+A1.lastDraw = 0;
+
+function a1Seeded(str) {
+  let h = 2166136261;
+  for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return function() {
+    h += 0x6D2B79F5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function a1MakeParticles(room, id) {
+  const rnd = a1Seeded(id + ":dust");
+  const list = [];
+  const count = Math.round(room.width / 26);
+  for (let i = 0; i < count; i++) {
+    list.push({
+      x: rnd() * room.width,
+      y: 80 + rnd() * 700,
+      r: 1 + rnd() * 2.2,
+      vx: (rnd() - 0.5) * 10,
+      vy: -4 - rnd() * 10,
+      ph: rnd() * Math.PI * 2,
+      glow: rnd() < 0.22
+    });
+  }
+  return list;
+}
+
+function a1MakeShafts(room, id) {
+  const rnd = a1Seeded(id + ":light");
+  const shafts = [];
+  for (const ex of room.exits || []) {
+    if (ex.side === "top") shafts.push({ x: (ex.from + ex.to) / 2, w: (ex.to - ex.from) * 0.7, strong: true });
+  }
+  const n = 1 + Math.floor(rnd() * 2);
+  for (let i = 0; i < n; i++) {
+    shafts.push({ x: 200 + rnd() * (room.width - 400), w: 80 + rnd() * 120, strong: false });
+  }
+  return shafts;
+}
+
+function a1MakeForeground(room, id) {
+  const rnd = a1Seeded(id + ":fg");
+  const items = [];
+  for (let x = -200; x < room.width * 1.3 + 400; x += 170 + rnd() * 260) {
+    items.push({ x, kind: rnd() < 0.55 ? "vine" : "root", len: 60 + rnd() * 150, w: 8 + rnd() * 14, ph: rnd() * Math.PI * 2 });
+  }
+  return items;
+}
+
+function a1FogFill(color, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.restore();
+}
+
 function a1DrawParallax() {
-  ctx.fillStyle = "#071015";
+  const pal = A1.palette[a1CurrentRoom().zone];
+  ctx.fillStyle = pal.fog;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  a1DrawBackgroundLayer(A1.assets.bg, 0.03, 3, 0, 1);
-  a1DrawBackgroundLayer(A1.assets.mid1, 0.12, 3, 0, 0.95);
-  a1DrawBackgroundLayer(A1.assets.mid2, 0.25, 3, 0, 0.92);
-  a1DrawBackgroundLayer(A1.assets.trees, 0.48, 3, 0, 0.92);
+  // Aerial perspective: each farther layer sinks deeper into the zone fog.
+  a1DrawBackgroundLayer(A1.assets.bg, 0.03, 3, 0, 0.55);
+  a1FogFill(pal.fog, 0.55);
+  a1DrawBackgroundLayer(A1.assets.mid1, 0.12, 3, 0, 0.9);
+  a1FogFill(pal.fog, 0.45);
+  a1DrawBackgroundLayer(A1.assets.mid2, 0.25, 3, 0, 0.9);
+  a1FogFill(pal.fog, 0.32);
+  a1DrawBackgroundLayer(A1.assets.trees, 0.48, 3, 0, 0.95);
+  a1FogFill(pal.fog, 0.2);
 
-  // Brazilian warm dawn accent without filtering the pixel assets.
-  const g = ctx.createRadialGradient(WIDTH * 0.72, HEIGHT * 0.28, 12, WIDTH * 0.72, HEIGHT * 0.28, 270);
-  g.addColorStop(0, "rgba(255,190,104,.16)");
-  g.addColorStop(1, "rgba(255,190,104,0)");
+  const g = ctx.createRadialGradient(WIDTH * 0.66, HEIGHT * 0.28, 10, WIDTH * 0.66, HEIGHT * 0.28, WIDTH * 0.48);
+  g.addColorStop(0, `rgba(${pal.light},.16)`);
+  g.addColorStop(1, `rgba(${pal.light},0)`);
   ctx.fillStyle = g;
-  ctx.fillRect(WIDTH * 0.45, 0, WIDTH * 0.5, HEIGHT * 0.65);
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+}
+
+function a1DrawShafts(room) {
+  const pal = A1.palette[room.zone];
+  const t = performance.now() * 0.001;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  A1.shafts.forEach((s, i) => {
+    const a = (s.strong ? 0.17 : 0.08) * (0.8 + 0.2 * Math.sin(t * 0.7 + i));
+    const g = ctx.createLinearGradient(0, 0, 0, 780);
+    g.addColorStop(0, `rgba(${pal.light},${a})`);
+    g.addColorStop(1, `rgba(${pal.light},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(s.x - s.w / 2, 0);
+    ctx.lineTo(s.x + s.w / 2, 0);
+    ctx.lineTo(s.x + s.w * 1.1 + 120, 780);
+    ctx.lineTo(s.x - s.w * 0.3 + 120, 780);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function a1DrawParticles(room, dt) {
+  const pal = A1.palette[room.zone];
+  const t = performance.now() * 0.001;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of A1.particles) {
+    p.x += (p.vx + Math.sin(t * 0.8 + p.ph) * 6) * dt;
+    p.y += p.vy * dt;
+    if (p.y < 40) p.y = 820;
+    if (p.x < 0) p.x += room.width;
+    if (p.x > room.width) p.x -= room.width;
+    if (p.x < camera.x - 20 || p.x > camera.x + WIDTH + 20 || p.y < camera.y - 20 || p.y > camera.y + HEIGHT + 20) continue;
+
+    const a = 0.2 + 0.4 * Math.sin(t * 2 + p.ph) ** 2;
+    if (p.glow) {
+      const R = p.r * 7;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+      g.addColorStop(0, `rgba(${pal.light},${a * 0.6})`);
+      g.addColorStop(1, `rgba(${pal.light},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - R, p.y - R, R * 2, R * 2);
+    }
+    ctx.fillStyle = `rgba(${pal.light},${a})`;
+    ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.ceil(p.r), Math.ceil(p.r));
+  }
+  ctx.restore();
+}
+
+function a1DrawGroundMist(room) {
+  const pal = A1.palette[room.zone];
+  const t = performance.now() * 0.001;
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const y = 728 + i * 20;
+    const g = ctx.createLinearGradient(0, y - 40, 0, y + 60);
+    g.addColorStop(0, `rgba(${pal.light},0)`);
+    g.addColorStop(0.5, `rgba(${pal.light},.05)`);
+    g.addColorStop(1, `rgba(${pal.light},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(camera.x - 80 + Math.sin(t * 0.3 + i) * 40, y - 40, WIDTH + 160, 100);
+  }
+  ctx.restore();
+}
+
+function a1DrawRoomFrame(c, room) {
+  // Enclosed chamber silhouette: jagged ceiling with stalactites and rock walls,
+  // opened only where the room actually connects to another room.
+  const rnd = a1Seeded(A1.node + ":frame");
+  const pal = A1.palette[room.zone];
+  const H = A1.roomHeight;
+  const rock = c.createLinearGradient(0, 0, 0, H);
+  rock.addColorStop(0, "#04080a");
+  rock.addColorStop(1, "#081013");
+  const rim = `rgba(${pal.light},.34)`;
+  const exits = room.exits || [];
+  const tops = exits.filter(e => e.side === "top");
+  const inTop = x => tops.some(e => x > e.from - 6 && x < e.to + 6);
+
+  const ceil = [];
+  for (let x = 0; x <= room.width; x += 24) {
+    if (inTop(x)) { ceil.push([x, -6, true]); continue; }
+    const y = 44 + rnd() * 20;
+    if (rnd() < 0.14) {
+      const len = 34 + rnd() * 52;
+      ceil.push([x - 8, y], [x, y + len], [x + 8, y]);
+    } else {
+      ceil.push([x, y]);
+    }
+  }
+
+  c.save();
+  c.fillStyle = rock;
+  c.strokeStyle = rim;
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(0, -6);
+  for (const [x, y] of ceil) c.lineTo(x, y);
+  c.lineTo(room.width, -6);
+  c.closePath();
+  c.fill();
+
+  c.beginPath();
+  let pen = false;
+  for (const [x, y, gap] of ceil) {
+    if (gap) { pen = false; continue; }
+    pen ? c.lineTo(x, y) : c.moveTo(x, y);
+    pen = true;
+  }
+  c.stroke();
+
+  for (const side of ["left", "right"]) {
+    const gaps = exits.filter(e => e.side === side).map(e => [e.from - 6, 9999]);
+    const edge = side === "left" ? -4 : room.width + 4;
+    const pts = [];
+    for (let y = -6; y <= H + 28; y += 28) {
+      const gap = gaps.some(([a, b]) => y > a && y < b);
+      const th = gap ? 0 : 22 + rnd() * 16;
+      pts.push([side === "left" ? th : room.width - th, y, gap]);
+    }
+    c.beginPath();
+    c.moveTo(edge, -6);
+    for (const [x, y] of pts) c.lineTo(x, y);
+    c.lineTo(edge, H + 28);
+    c.closePath();
+    c.fill();
+
+    c.beginPath();
+    pen = false;
+    for (const [x, y, gap] of pts) {
+      if (gap) { pen = false; continue; }
+      pen ? c.lineTo(x, y) : c.moveTo(x, y);
+      pen = true;
+    }
+    c.stroke();
+  }
+  c.restore();
 }
 
 function a1DrawLandmark(ctx2, room) {
@@ -1050,6 +1272,8 @@ function a1BuildRoomCache() {
       }
     }
   }
+
+  a1DrawRoomFrame(c, room);
 
   A1.roomCacheDirty = false;
 }
@@ -1194,19 +1418,34 @@ drawCheckpoint = function() {
 function a1DrawExitCue(ex) {
   const room = a1CurrentRoom();
   const unlocked = a1CanUseExit(ex);
+  const pal = A1.palette[room.zone];
+  const t = performance.now() * 0.001;
+  const a = (unlocked ? 0.22 : 0.08) * (0.85 + 0.15 * Math.sin(t * 2));
   ctx.save();
-  ctx.globalAlpha = unlocked ? .62 : .28;
-  ctx.strokeStyle = unlocked ? "#88bfa8" : "#4d7f87";
-  ctx.lineWidth = 3;
+  ctx.globalCompositeOperation = "lighter";
 
   if (ex.side === "left" || ex.side === "right") {
-    const x = ex.side === "left" ? 16 : room.width - 34;
-    const y = Math.max(120, Math.min(650, (ex.from + ex.to) / 2 - 54));
-    ctx.strokeRect(x, y, 18, 108);
-  } else {
-    const x = Math.max(30, Math.min(room.width - 70, (ex.from + ex.to) / 2 - 20));
-    const y = ex.side === "top" ? 34 : 710;
-    ctx.strokeRect(x, y, 40, 18);
+    const top = Math.max(60, ex.from);
+    const bot = Math.min(760, ex.to);
+    const x0 = ex.side === "left" ? 0 : room.width;
+    const x1 = ex.side === "left" ? 160 : room.width - 160;
+    const g = ctx.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, `rgba(${pal.light},${a})`);
+    g.addColorStop(1, `rgba(${pal.light},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.min(x0, x1), top, 160, bot - top);
+  } else if (ex.side === "bottom") {
+    const cx = (ex.from + ex.to) / 2;
+    ctx.strokeStyle = `rgba(${pal.light},${a * 2.4})`;
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 2; i++) {
+      const y = 712 + i * 14 + Math.sin(t * 3) * 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, y);
+      ctx.lineTo(cx, y + 10);
+      ctx.lineTo(cx + 14, y);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -1223,63 +1462,477 @@ drawRoomExit = function() {
   }
 };
 
-function a1DrawMap() {
-  const nodes = Object.entries(A1.rooms);
-  const minX = 0, maxX = 5, minY = 3, maxY = 6;
-  const cellW = 18, cellH = 12;
-  const mapW = (maxX - minX + 1) * cellW + 18;
-  const mapH = (maxY - minY + 1) * cellH + 18;
-  const x0 = WIDTH - mapW - 16;
-  const y0 = 76;
+// ----- Metroidvania map (minimap + full-screen cartographer map) -----
+const A1_MAP_INK = "#ddd2b4";
+const A1_MAP_ROW0 = 3;
 
+window.addEventListener("keydown", event => {
+  if (currentRoom !== 0) return;
+  if (event.code === "KeyM" || event.code === "Tab") {
+    event.preventDefault();
+    if (!event.repeat) A1.fullMap = !A1.fullMap;
+  } else if (event.code === "Escape" && A1.fullMap) {
+    A1.fullMap = false;
+  }
+});
+
+function a1MapRect(id, ox, oy, cw, ch) {
+  const room = A1.rooms[id];
+  const [mx, my] = room.map;
+  const padX = cw * 0.1;
+  const padY = ch * 0.17;
+  const w = (cw - padX * 2) * (0.72 + 0.28 * Math.min(1, room.width / 1840));
+  const h = ch - padY * 2;
+  return { x: ox + mx * cw + (cw - w) / 2, y: oy + (my - A1_MAP_ROW0) * ch + padY, w, h };
+}
+
+function a1ExitPoint(id, ex, r) {
+  const room = A1.rooms[id];
+  const sx = r.w / room.width;
+  const sy = r.h / A1.roomHeight;
+  const mid = (ex.from + ex.to) / 2;
+  if (ex.side === "left") return { x: r.x, y: r.y + Math.min(mid, 800) * sy };
+  if (ex.side === "right") return { x: r.x + r.w, y: r.y + Math.min(mid, 800) * sy };
+  if (ex.side === "top") return { x: r.x + mid * sx, y: r.y };
+  return { x: r.x + mid * sx, y: r.y + r.h };
+}
+
+function a1CorridorPoints(id, ex, rects) {
+  const p = a1ExitPoint(id, ex, rects[id]);
+  const d = rects[ex.dest];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  if (ex.side === "left" || ex.side === "right") {
+    const dx = ex.side === "right" ? d.x : d.x + d.w;
+    const qy = clamp(p.y, d.y + 3, d.y + d.h - 3);
+    const gx = (p.x + dx) / 2;
+    return [p, { x: gx, y: p.y }, { x: gx, y: qy }, { x: dx, y: qy }];
+  }
+  const dy = ex.side === "top" ? d.y + d.h : d.y;
+  const qx = clamp(p.x, d.x + 3, d.x + d.w - 3);
+  const gy = (p.y + dy) / 2;
+  return [p, { x: p.x, y: gy }, { x: qx, y: gy }, { x: qx, y: dy }];
+}
+
+function a1StrokePath(pts) {
+  ctx.beginPath();
+  pts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+  ctx.stroke();
+}
+
+function a1DrawWaterLock(x, y, s) {
   ctx.save();
-  ctx.fillStyle = "rgba(4,10,13,.68)";
-  ctx.fillRect(x0, y0, mapW, mapH);
-  ctx.strokeStyle = "rgba(170,200,190,.35)";
-  ctx.strokeRect(x0, y0, mapW, mapH);
+  ctx.fillStyle = "#123447";
+  ctx.strokeStyle = "#8fd8ff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#8fd8ff";
+  ctx.beginPath();
+  ctx.moveTo(x, y - s * 0.6);
+  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.05, x, y + s * 0.5);
+  ctx.quadraticCurveTo(x - s * 0.5, y + s * 0.05, x, y - s * 0.6);
+  ctx.fill();
+  ctx.restore();
+}
 
-  for (const [id, room] of nodes) {
-    if (!A1.discovered.has(id) && id !== A1.node) continue;
-    const [mx,my] = room.map;
-    const x = x0 + 9 + (mx-minX)*cellW;
-    const y = y0 + 9 + (my-minY)*cellH;
-    ctx.fillStyle = A1.zoneColors[room.zone];
-    ctx.globalAlpha = id === A1.node ? 1 : .52;
-    ctx.fillRect(x, y, 14, 8);
-    if (id === A1.node) {
-      ctx.strokeStyle = "#f4e4ad";
-      ctx.strokeRect(x-1,y-1,16,10);
+function a1DrawBench(x, y, s, active) {
+  ctx.save();
+  ctx.fillStyle = active ? "#7de6ac" : "#e8c46a";
+  ctx.fillRect(x - s, y - s * 0.55, s * 2, s * 0.35);
+  ctx.fillRect(x - s, y - s * 1.2, s * 0.3, s * 1.2);
+  ctx.fillRect(x + s * 0.7, y - s * 1.2, s * 0.3, s * 1.2);
+  ctx.fillRect(x - s * 0.8, y - s * 0.1, s * 0.25, s * 0.5);
+  ctx.fillRect(x + s * 0.55, y - s * 0.1, s * 0.25, s * 0.5);
+  ctx.restore();
+}
+
+function a1DrawMacMarker(x, y, s) {
+  const t = performance.now() * 0.001;
+  ctx.save();
+  ctx.strokeStyle = `rgba(155,227,106,${0.55 - 0.45 * ((t * 1.2) % 1)})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, s + ((t * 1.2) % 1) * s * 2.2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#9be36a";
+  ctx.strokeStyle = "#0a120c";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(x, y, s * 1.15, s * 0.85, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#0a120c";
+  ctx.fillRect(x - s * 0.6, y - s * 0.45, s * 0.35, s * 0.35);
+  ctx.fillRect(x + s * 0.25, y - s * 0.45, s * 0.35, s * 0.35);
+  ctx.restore();
+}
+
+function a1RenderMap(ox, oy, cw, ch, opt = {}) {
+  const mini = !!opt.mini;
+  const t = performance.now() * 0.001;
+  const ids = Object.keys(A1.rooms);
+  const known = new Set(A1.discovered);
+  known.add(A1.node);
+  const hinted = new Set();
+  for (const id of known) {
+    for (const ex of A1.rooms[id].exits || []) {
+      if (A1.rooms[ex.dest] && !known.has(ex.dest)) hinted.add(ex.dest);
     }
   }
+
+  const rects = {};
+  for (const id of ids) rects[id] = a1MapRect(id, ox, oy, cw, ch);
+
+  ctx.save();
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+
+  // Corridors first, so rooms sit on top of them like inked chambers.
+  const drawn = new Set();
+  const locks = [];
+  for (const id of known) {
+    for (const ex of A1.rooms[id].exits || []) {
+      if (!A1.rooms[ex.dest]) continue;
+      const key = [id, ex.dest].sort().join("|");
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+
+      const pts = a1CorridorPoints(id, ex, rects);
+      const both = known.has(ex.dest);
+      ctx.setLineDash(both ? [] : [3, 3]);
+      ctx.globalAlpha = both ? 1 : 0.55;
+      ctx.strokeStyle = A1_MAP_INK;
+      ctx.lineWidth = mini ? 5 : 8;
+      a1StrokePath(pts);
+      ctx.strokeStyle = "#0b1114";
+      ctx.lineWidth = mini ? 2 : 4;
+      a1StrokePath(pts);
+      ctx.globalAlpha = 1;
+
+      if (ex.requiresWater && !mac.waterPower) {
+        locks.push({ x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 });
+      }
+    }
+  }
+  ctx.setLineDash([]);
+
+  // Rooms
+  for (const id of ids) {
+    if (!known.has(id) && !hinted.has(id)) continue;
+    const r = rects[id];
+    const room = A1.rooms[id];
+    const pal = A1.palette[room.zone];
+
+    if (!known.has(id)) {
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(221,210,180,.35)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(221,210,180,.4)";
+      ctx.font = `${mini ? 12 : 18}px Georgia, serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("?", r.x + r.w / 2, r.y + r.h / 2);
+      continue;
+    }
+
+    const current = id === A1.node;
+    ctx.fillStyle = "#0a1013";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.globalAlpha = current ? 0.85 : 0.5;
+    ctx.fillStyle = pal.map;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.globalAlpha = 1;
+
+    // Miniature of the room's real geometry, like a cartographer's sketch.
+    const sx = r.w / room.width;
+    const sy = r.h / A1.roomHeight;
+    ctx.fillStyle = "rgba(221,210,180,.6)";
+    for (const f of room.floors || []) {
+      ctx.fillRect(r.x + f.x * sx, r.y + f.y * sy, Math.max(1, f.width * sx), r.h - f.y * sy);
+    }
+    for (const pl of room.platforms || []) {
+      ctx.fillRect(r.x + pl.x * sx, r.y + pl.y * sy, Math.max(1, pl.width * sx), mini ? 1 : 1.5);
+    }
+    for (const w of room.walls || []) {
+      ctx.fillRect(r.x + w.x * sx, r.y + w.y * sy, Math.max(1.5, w.width * sx), w.height * sy);
+    }
+    ctx.fillStyle = "rgba(10,16,19,.9)";
+    for (const pit of room.pits || []) {
+      ctx.fillRect(r.x + pit.x * sx, r.y + 760 * sy, pit.width * sx, r.h - 760 * sy);
+    }
+
+    ctx.strokeStyle = A1_MAP_INK;
+    ctx.lineWidth = mini ? 1.5 : 2;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    if (current) {
+      ctx.strokeStyle = `rgba(244,228,173,${0.35 + 0.3 * Math.sin(t * 3) ** 2})`;
+      ctx.lineWidth = mini ? 2 : 3;
+      ctx.strokeRect(r.x - 3, r.y - 3, r.w + 6, r.h + 6);
+    }
+
+    if (opt.labels) {
+      ctx.fillStyle = current ? "#f4e4ad" : "rgba(221,210,180,.75)";
+      ctx.font = "italic 11px Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(room.name, r.x + r.w / 2, r.y + r.h + 4);
+    }
+
+    if (room.checkpoint) {
+      a1DrawBench(r.x + A1.checkpointX * sx, r.y + 760 * sy - 2, mini ? 4 : 6, currentCheckpointId === checkpoints[0].id);
+    }
+    if (room.waterFly && !waterFly.collected) {
+      a1DrawWaterLock(r.x + room.waterFly.x * sx, r.y + room.waterFly.y * sy, mini ? 3.5 : 5);
+    }
+    if ((room.exits || []).some(e => e.dest === "__NEXT_AREA__")) {
+      const ax = r.x + r.w + (mini ? 4 : 8);
+      const ay = r.y + r.h * 0.72;
+      const s = mini ? 5 : 8;
+      ctx.fillStyle = A1_MAP_INK;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay - s);
+      ctx.lineTo(ax + s * 1.3, ay);
+      ctx.lineTo(ax, ay + s);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  for (const l of locks) a1DrawWaterLock(l.x, l.y, mini ? 4 : 6);
+
+  const cur = a1CurrentRoom();
+  const cr = rects[A1.node];
+  a1DrawMacMarker(
+    cr.x + (mac.x + mac.width / 2) * (cr.w / cur.width),
+    cr.y + (mac.y + mac.height / 2) * (cr.h / A1.roomHeight),
+    mini ? 3.5 : 5
+  );
+
   ctx.restore();
+}
+
+function a1DrawOrnateFrame(x, y, w, h) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(221,210,180,.7)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.strokeStyle = "rgba(221,210,180,.25)";
+  ctx.strokeRect(x + 4.5, y + 4.5, w - 9, h - 9);
+  ctx.fillStyle = A1_MAP_INK;
+  for (const [cx, cy] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 5);
+    ctx.lineTo(cx + 5, cy);
+    ctx.lineTo(cx, cy + 5);
+    ctx.lineTo(cx - 5, cy);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function a1DrawMiniMap() {
+  const pw = 220;
+  const ph = 124;
+  const px = WIDTH - pw - 16;
+  const py = 66;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,8,10,.82)";
+  ctx.fillRect(px, py, pw, ph);
+
+  ctx.beginPath();
+  ctx.rect(px + 2, py + 2, pw - 4, ph - 4);
+  ctx.clip();
+
+  const cw = 64;
+  const ch = 40;
+  const [mx, my] = a1CurrentRoom().map;
+  const ox = px + pw / 2 - (mx + 0.5) * cw;
+  const oy = py + ph / 2 - 8 - (my - A1_MAP_ROW0 + 0.5) * ch;
+  a1RenderMap(ox, oy, cw, ch, { mini: true });
+  ctx.restore();
+
+  ctx.save();
+  const lg = ctx.createLinearGradient(0, py + ph - 22, 0, py + ph);
+  lg.addColorStop(0, "rgba(4,8,10,0)");
+  lg.addColorStop(1, "rgba(4,8,10,.95)");
+  ctx.fillStyle = lg;
+  ctx.fillRect(px, py + ph - 22, pw, 22);
+  ctx.fillStyle = "rgba(221,210,180,.85)";
+  ctx.font = "italic 11px Georgia, serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.fillText(a1CurrentRoom().name, px + 10, py + ph - 6);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(221,210,180,.5)";
+  ctx.font = "10px sans-serif";
+  ctx.fillText("[M] mapa", px + pw - 10, py + ph - 6);
+  ctx.restore();
+
+  a1DrawOrnateFrame(px, py, pw, ph);
+}
+
+function a1DrawFullMap() {
+  ctx.save();
+  ctx.fillStyle = "rgba(3,6,8,.93)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const g = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 30, WIDTH / 2, HEIGHT / 2, WIDTH * 0.62);
+  g.addColorStop(0, "rgba(70,74,62,.28)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Title
+  const pal = A1.palette[a1CurrentRoom().zone];
+  ctx.fillStyle = A1_MAP_INK;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = "24px Georgia, serif";
+  const title = "MANGUEZAL  DAS  RUÍNAS";
+  ctx.fillText(title, WIDTH / 2, 22);
+  const tw = ctx.measureText(title).width;
+  ctx.strokeStyle = "rgba(221,210,180,.5)";
+  ctx.lineWidth = 1;
+  for (const dir of [-1, 1]) {
+    const sx = WIDTH / 2 + dir * (tw / 2 + 16);
+    ctx.beginPath();
+    ctx.moveTo(sx, 36);
+    ctx.lineTo(sx + dir * 90, 36);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx + dir * 94, 36, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = A1_MAP_INK;
+    ctx.fill();
+  }
+  ctx.font = "italic 14px Georgia, serif";
+  ctx.fillStyle = `rgb(${pal.light})`;
+  ctx.fillText(pal.label + "  ·  " + a1CurrentRoom().name, WIDTH / 2, 54);
+
+  // Map grid
+  const cols = 6;
+  const rows = 4;
+  const availH = HEIGHT - 170;
+  const cw = Math.min((WIDTH - 120) / cols, availH / rows / 0.62, 190);
+  const ch = cw * 0.62;
+  const ox = (WIDTH - cw * cols) / 2;
+  const oy = 84 + (availH - ch * rows) / 2;
+  a1RenderMap(ox, oy, cw, ch, { labels: cw >= 110 });
+
+  // Legend
+  const ly = HEIGHT - 58;
+  ctx.font = "12px sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  const zones = ["red", "purple", "green", "blue"];
+  let lx = WIDTH / 2 - 330;
+  for (const z of zones) {
+    ctx.fillStyle = A1.palette[z].map;
+    ctx.fillRect(lx, ly - 6, 16, 12);
+    ctx.strokeStyle = A1_MAP_INK;
+    ctx.strokeRect(lx + 0.5, ly - 5.5, 15, 11);
+    ctx.fillStyle = "rgba(221,210,180,.85)";
+    ctx.fillText(A1.palette[z].label, lx + 22, ly);
+    lx += 34 + ctx.measureText(A1.palette[z].label).width;
+  }
+  a1DrawMacMarker(lx + 6, ly, 4.5);
+  ctx.fillStyle = "rgba(221,210,180,.85)";
+  ctx.fillText("Você", lx + 18, ly);
+  lx += 62;
+  a1DrawBench(lx + 6, ly + 4, 6, currentCheckpointId === checkpoints[0].id);
+  ctx.fillStyle = "rgba(221,210,180,.85)";
+  ctx.fillText("Banco", lx + 18, ly);
+  lx += 66;
+  a1DrawWaterLock(lx + 6, ly, 6);
+  ctx.fillStyle = "rgba(221,210,180,.85)";
+  ctx.fillText("Requer água", lx + 18, ly);
+
+  const total = Object.keys(A1.rooms).length;
+  const seen = Object.keys(A1.rooms).filter(id => A1.discovered.has(id)).length;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(221,210,180,.55)";
+  ctx.font = "12px sans-serif";
+  ctx.fillText("Salas exploradas " + seen + "/" + total + "     [M] ou [Tab] fechar", WIDTH / 2, HEIGHT - 26);
+  ctx.restore();
+
+  a1DrawOrnateFrame(16, 12, WIDTH - 32, HEIGHT - 24);
 }
 
 const __a1BaseDrawHUD = drawHUD;
 drawHUD = function() {
   __a1BaseDrawHUD();
-  if (currentRoom === 0) a1DrawMap();
+  if (currentRoom !== 0) return;
+  if (A1.fullMap) a1DrawFullMap();
+  else a1DrawMiniMap();
 };
 
 function a1DrawForeground() {
+  // Near-camera silhouettes (hanging vines above, roots below) scroll faster
+  // than the world for the deep layered look of Hollow Knight rooms.
+  const t = performance.now() * 0.001;
+  const topY = -camera.y * 0.6;
+  const baseY = HEIGHT + (A1.roomHeight - HEIGHT - camera.y) * 0.6;
+
   ctx.save();
-  ctx.globalAlpha = .60;
-  ctx.strokeStyle = "#06120f";
+  ctx.fillStyle = "#020405";
+  ctx.strokeStyle = "#020405";
   ctx.lineCap = "round";
-  const offset = -((camera.x * .035) % 260);
-  for (let i=-1;i<7;i++) {
-    const x = offset + i*245;
-    ctx.lineWidth = 16;
-    ctx.beginPath(); ctx.moveTo(x, HEIGHT+20); ctx.quadraticCurveTo(x-30,HEIGHT-100,x+10,HEIGHT-210); ctx.stroke();
-    ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.moveTo(x,HEIGHT-95); ctx.lineTo(x-58,HEIGHT-135); ctx.moveTo(x+8,HEIGHT-82); ctx.lineTo(x+68,HEIGHT-122); ctx.stroke();
+  for (const it of A1.fgItems) {
+    const sx = it.x - camera.x * 1.3;
+    if (sx < -260 || sx > WIDTH + 260) continue;
+
+    if (it.kind === "vine") {
+      const sway = Math.sin(t * 0.9 + it.ph) * 8;
+      ctx.lineWidth = Math.max(3, it.w * 0.35);
+      ctx.beginPath();
+      ctx.moveTo(sx, topY - 10);
+      ctx.quadraticCurveTo(sx + sway * 0.5, topY + it.len * 0.5, sx + sway, topY + it.len);
+      ctx.stroke();
+      for (let k = 1; k <= 3; k++) {
+        const ly = topY + (it.len * k) / 3.4;
+        const lx = sx + (sway * k) / 3.4;
+        ctx.beginPath();
+        ctx.ellipse(lx + (k % 2 ? 7 : -7), ly, 9, 4, k % 2 ? 0.6 : -0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.ellipse(sx, topY - 20, it.w * 4, 40, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(sx - it.w * 2.2, baseY + 10);
+      ctx.quadraticCurveTo(sx - it.w * 0.4, baseY - it.len * 0.4, sx, baseY - it.len);
+      ctx.quadraticCurveTo(sx + it.w * 0.4, baseY - it.len * 0.4, sx + it.w * 2.2, baseY + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(sx, baseY + 20, it.w * 5, 34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
+}
 
-  const v = ctx.createRadialGradient(WIDTH/2,HEIGHT/2,HEIGHT*.35,WIDTH/2,HEIGHT/2,WIDTH*.78);
-  v.addColorStop(0,"rgba(0,0,0,0)");
-  v.addColorStop(1,"rgba(0,7,9,.34)");
+function a1DrawGrade() {
+  const pal = A1.palette[a1CurrentRoom().zone];
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = pal.tint;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.restore();
+
+  const v = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, HEIGHT * 0.3, WIDTH / 2, HEIGHT / 2, WIDTH * 0.72);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(0,4,6,.62)");
   ctx.fillStyle = v;
-  ctx.fillRect(0,0,WIDTH,HEIGHT);
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 }
 
 const __a1BaseDraw = draw;
@@ -1292,10 +1945,17 @@ draw = function() {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
+  const now = performance.now();
+  const frameDt = A1.lastDraw ? Math.min(0.05, (now - A1.lastDraw) / 1000) : 0;
+  A1.lastDraw = now;
+  const room = a1CurrentRoom();
+
   a1DrawParallax();
 
   ctx.save();
   ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+  a1DrawShafts(room);
 
   if (A1.roomCacheDirty) a1BuildRoomCache();
   if (A1.roomCache) {
@@ -1336,9 +1996,12 @@ draw = function() {
   }
 
   drawTongueHitbox();
+  a1DrawParticles(room, A1.fullMap ? 0 : frameDt);
+  a1DrawGroundMist(room);
   ctx.restore();
 
   a1DrawForeground();
+  a1DrawGrade();
   drawHUD();
 };
 
