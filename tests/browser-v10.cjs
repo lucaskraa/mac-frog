@@ -17,7 +17,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.equal(original.form,'base');
   assert.equal((await page.evaluate(()=>window.MacFrogV10.validate())).ok,true);
   const meta=await page.evaluate(()=>window.MacFrogV10Art.info());
-  assert.equal(meta.atlases,72,'Nine forms * eight states must be rendered');
+  assert.equal(meta.atlases,99,'Nine forms * eleven animation states must be rendered');
   assert.deepEqual(meta.size,[72,88]);
   assert.equal(meta.frames,8);
   const forms=await page.evaluate(()=>window.MacFrogV10.registry());
