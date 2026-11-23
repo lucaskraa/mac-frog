@@ -54,7 +54,10 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   }
   // Physical fall: start above a genuine gap and let the original gravity,
   // collisions, event loop and transition system do the work (no direct teleport).
-  for(const start of ['entrada','poco','torre']){
+  const fallRooms=await page.evaluate(()=>window.MacFrogMapV6.rooms()
+    .filter(r=>r.exits.some(e=>e.side==='bottom')).map(r=>r.id));
+  assert.equal(fallRooms.length,33,'Expected 33 physically descending passages');
+  for(const start of fallRooms){
    const prepared=await page.evaluate(id=>window.MacFrogV9Dev.preparePhysicalFall(id),start);
    await page.waitForFunction(
     origin=>window.MacFrogV9.info().room!==origin,start,{timeout:4800}
@@ -63,6 +66,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    assert.equal(arrived.room,prepared.expected,
       'Natural falling descent failed: '+JSON.stringify({prepared,arrived}));
   }
+  console.log('ALL_V9_FALLS_OK',JSON.stringify({count:fallRooms.length}));
   await page.evaluate(()=>window.MacFrogV9Dev.enter('mina'));
   await page.waitForTimeout(180);
   await page.screenshot({path:path.join(out,'v9-lacraia.png')});
