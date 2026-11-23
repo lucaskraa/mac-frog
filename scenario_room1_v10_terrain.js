@@ -11,7 +11,7 @@ licensed.onload=()=>{licensedReady=true;A1.roomCacheDirty=true;};
 licensed.onerror=()=>console.warn("V10 CC0 swamp vegetation tile atlas missing; fall back to original procedural pixels");
 fetch("./assets/gothicvania-swamp/tileset.b64",{cache:"force-cache"})
  .then(r=>{if(!r.ok)throw Error("Missing swamp pixel atlas "+r.status);return r.text();})
- .then(base64=>licensed.src="data:image/png;base64,"+base64.trim().replace(/\\s+/g,""))
+ .then(base64=>licensed.src="data:image/png;base64,"+base64.trim().replace(/\s+/g,""))
  .catch(e=>console.warn("V10 optional CC0 vegetation:",e));
 const PALETTES={
   mangue:{rock:["#202a29","#35433c","#536052","#79816a","#b2ad76"],soil:["#201d20","#45392f","#62503b","#85714b","#c1b874"],leaf:["#31593a","#557c4a","#98aa55","#c6ce74"],glow:"#e4b46d",sky:"#0d2625"},
