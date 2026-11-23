@@ -15,7 +15,7 @@
 (async () => {
   const status = document.getElementById('status');
   try {
-    const [gameResponse, roomResponse, blueprintsResponse, connectorsResponse, coreResponse, visualResponse, v9Response, v9VisualResponse] = await Promise.all([
+    const [gameResponse, roomResponse, blueprintsResponse, connectorsResponse, coreResponse, visualResponse, v9Response, v9VisualResponse, v9FxResponse] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
       fetch('./scenario_room1_v6.js', {cache:'no-store'}),
       fetch('./area1_blueprints_v8.js', {cache:'no-store'}),
@@ -23,7 +23,8 @@
       fetch('./scenario_room1_v8.js', {cache:'no-store'}),
       fetch('./scenario_room1_v8_visual.js', {cache:'no-store'}),
       fetch('./scenario_room1_v9.js', {cache:'no-store'}),
-      fetch('./scenario_room1_v9_visual.js', {cache:'no-store'})
+      fetch('./scenario_room1_v9_visual.js', {cache:'no-store'}),
+      fetch('./scenario_room1_v9_fx.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
@@ -34,6 +35,7 @@
     if (!visualResponse.ok) throw new Error('scenario_room1_v8_visual.js não carregou');
     if (!v9Response.ok) throw new Error('scenario_room1_v9.js não carregou');
     if (!v9VisualResponse.ok) throw new Error('scenario_room1_v9_visual.js não carregou');
+    if (!v9FxResponse.ok) throw new Error('scenario_room1_v9_fx.js não carregou');
 
     let game = await gameResponse.text();
     const roomV6 = await roomResponse.text();
@@ -43,6 +45,7 @@
     const visualV8 = await visualResponse.text();
     const coreV9 = await v9Response.text();
     const visualV9 = await v9VisualResponse.text();
+    const fxV9 = await v9FxResponse.text();
 
     game = game.replace(
       'const WORLD_WIDTH = 3000;',
@@ -61,7 +64,7 @@
 
     game = game.replace(
       bootMarker,
-      '\n' + roomV6 + '\n\n' + blueprintV8 + '\n\n' + connectorsV8 + '\n\n' + coreV8 + '\n\n' + visualV8 + '\n\n' + coreV9 + '\n\n' + visualV9 + '\n\n' + bootMarker
+      '\n' + roomV6 + '\n\n' + blueprintV8 + '\n\n' + connectorsV8 + '\n\n' + coreV8 + '\n\n' + visualV8 + '\n\n' + coreV9 + '\n\n' + visualV9 + '\n\n' + fxV9 + '\n\n' + bootMarker
     );
 
     document.open();
