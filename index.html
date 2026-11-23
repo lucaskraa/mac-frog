@@ -15,7 +15,7 @@
 (async () => {
   const status = document.getElementById('status');
   try {
-    const [gameResponse, roomResponse, blueprintsResponse, connectorsResponse, coreResponse, visualResponse, v9Response, v9VisualResponse, v9BackdropResponse, v9FxResponse, v10Response, v10VisualResponse, v10TerrainResponse, v10ParallaxResponse] = await Promise.all([
+    const [gameResponse, roomResponse, blueprintsResponse, connectorsResponse, coreResponse, visualResponse, v9Response, v9VisualResponse, v9BackdropResponse, v9FxResponse, v10Response, v10VisualResponse, v10TerrainResponse, v10ParallaxResponse, v10EnemiesResponse] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
       fetch('./scenario_room1_v6.js', {cache:'no-store'}),
       fetch('./area1_blueprints_v8.js', {cache:'no-store'}),
@@ -29,7 +29,8 @@
       fetch('./scenario_room1_v10.js', {cache:'no-store'}),
       fetch('./scenario_room1_v10_visual.js', {cache:'no-store'}),
       fetch('./scenario_room1_v10_terrain.js', {cache:'no-store'}),
-      fetch('./scenario_room1_v10_parallax.js', {cache:'no-store'})
+      fetch('./scenario_room1_v10_parallax.js', {cache:'no-store'}),
+      fetch('./scenario_room1_v10_enemies.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
@@ -46,6 +47,7 @@
     if (!v10VisualResponse.ok) throw new Error('scenario_room1_v10_visual.js não carregou');
     if (!v10TerrainResponse.ok) throw new Error('scenario_room1_v10_terrain.js não carregou');
     if (!v10ParallaxResponse.ok) throw new Error('scenario_room1_v10_parallax.js não carregou');
+    if (!v10EnemiesResponse.ok) throw new Error('scenario_room1_v10_enemies.js não carregou');
 
     let game = await gameResponse.text();
     const roomV6 = await roomResponse.text();
@@ -61,6 +63,7 @@
     const artV10 = await v10VisualResponse.text();
     const terrainV10 = await v10TerrainResponse.text();
     const parallaxV10 = await v10ParallaxResponse.text();
+    const enemiesV10 = await v10EnemiesResponse.text();
 
     game = game.replace(
       'const WORLD_WIDTH = 3000;',
@@ -79,7 +82,7 @@
 
     game = game.replace(
       bootMarker,
-      '\n' + roomV6 + '\n\n' + blueprintV8 + '\n\n' + connectorsV8 + '\n\n' + coreV8 + '\n\n' + visualV8 + '\n\n' + coreV9 + '\n\n' + visualV9 + '\n\n' + backdropV9 + '\n\n' + fxV9 + '\n\n' + coreV10 + '\n\n' + artV10 + '\n\n' + terrainV10 + '\n\n' + parallaxV10 + '\n\n' + bootMarker
+      '\n' + roomV6 + '\n\n' + blueprintV8 + '\n\n' + connectorsV8 + '\n\n' + coreV8 + '\n\n' + visualV8 + '\n\n' + coreV9 + '\n\n' + visualV9 + '\n\n' + backdropV9 + '\n\n' + fxV9 + '\n\n' + coreV10 + '\n\n' + artV10 + '\n\n' + terrainV10 + '\n\n' + parallaxV10 + '\n\n' + enemiesV10 + '\n\n' + bootMarker
     );
 
     document.open();
