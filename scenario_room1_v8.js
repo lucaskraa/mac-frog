@@ -234,6 +234,29 @@
       return {ok:errors.length===0,errors};
     }
   });
+  // Developer-only walkthrough harness: never enabled in normal game URLs.
+  // Used by the Chromium CI to inspect distant/vertical rooms and ability gates.
+  if(typeof location!=="undefined" && new URLSearchParams(location.search).get("dev")==="1"){
+    window.MacFrogV8Dev=Object.freeze({
+      enter:(id,side="left")=>{
+        if(!rooms[id])throw Error("Unknown test room: "+id);
+        a1LoadNode(id,side,false);
+        return window.MacFrogV8.info();
+      },
+      setWater:enabled=>{
+        mac.waterPower=Boolean(enabled);
+        a1RoomGeometry(rooms[A1.node]);
+        A1.lastWaterPower=mac.waterPower;
+        A1.roomCacheDirty=true;
+        return mac.waterPower;
+      },
+      inspect:(id=A1.node)=>{
+        const room=rooms[id];if(!room)throw Error("Unknown room "+id);
+        return {id,width:room.width,height:room.height,doors:room.exits.map(e=>({id:e.id,side:e.side,dest:e.dest,water:e.requiresWater})),
+          platforms:room.platforms.length,floors:room.floors.length,anchors:room.anchors.length};
+      }
+    });
+  }
   A1.lastWaterPower=mac.waterPower;
   // Legacy V6 checkpoint reconciliation uses fixed positions and must not override V8 room saves.
   A1.bootReconciled=true;
