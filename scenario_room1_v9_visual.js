@@ -43,6 +43,22 @@ function texture(theme,style="stone"){
 function paint(c,r,kind){
  if(!r||r.width<=0||r.height<=0)return;
  const pal=colors(rooms[A1.node]),theme=rooms[A1.node].v9Theme;
+ // Pixel-art understructure is decorative; physics stays on the top collision surface.
+ if(r.height<=32){
+   c.save();
+   const stem=kind==="wood"?"#443b35":pal[1];
+   for(let x=r.x;x<r.x+r.width;x+=16){
+     const width=Math.min(16,r.x+r.width-x);
+     const depth=14+Math.floor(prng(x*47+r.y*19+theme.length*41)*4)*8;
+     c.fillStyle=stem;c.fillRect(x,r.y+6,width,depth);
+     c.fillStyle=kind==="wood"?"#6b533e":pal[2];
+     c.fillRect(x+2,r.y+10,Math.max(1,width-4),8);
+     if(kind==="moss"&&prng(x*13+r.y*53)>.66){
+       c.fillStyle="#638b59";c.fillRect(x+5,r.y+depth+5,3,11);
+     }
+   }
+   c.restore();
+ }
  const tx=texture(theme,kind);
  c.save();c.beginPath();c.rect(r.x,r.y,r.width,r.height);c.clip();
  c.fillStyle=c.createPattern(tx,"repeat");c.fillRect(r.x,r.y,r.width,r.height);
