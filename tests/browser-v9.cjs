@@ -57,7 +57,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   for(const start of ['entrada','poco','torre']){
    const prepared=await page.evaluate(id=>window.MacFrogV9Dev.preparePhysicalFall(id),start);
    await page.waitForFunction(
-    origin=>window.MacFrogV9.info().room!==origin,{timeout:4800},start
+    origin=>window.MacFrogV9.info().room!==origin,start,{timeout:4800}
    );
    const arrived=await page.evaluate(()=>window.MacFrogV9.info());
    assert.equal(arrived.room,prepared.expected,
