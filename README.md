@@ -19,7 +19,10 @@ Acesse `http://localhost:8765/`. O jogo continua em HTML5 Canvas e usa o motor `
 - **Mini-boss:** Lacraia das Profundezas nas Minas, com corpo de oito segmentos, aviso de investida, duas velocidades/fases, barra de vida e derrota registrada no armazenamento local.
 - **Chefe final:** o sapo tribal usa o boss e as hitboxes do motor original na Área 2, agora com novo corpo pixelado e ataque elástico extra na segunda fase.
 - **Mac Frog:** atlases de movimento e ataques originais preservados; partículas adicionais para dano, aterrissagem, água, vento e transições.
-- **Testes:** regressão V8, sintaxe V9 e browser Chromium com verificação das 136 direções do grafo e teste de derrota da lacraia.
+- **Arte ambiental complementar:** sete biomas com fundos originais renderizados em baixa resolução e escalados sem suavização, com raízes, ruínas, névoa, cavernas, archotes e silhuetas. Módulo `scenario_room1_v9_backdrop.js`.
+- **Batalhas aprimoradas:** lacraia com padrões de investida e golpe de área sinalizado; após a primeira derrota restaura até 35 pontos de vida. Chefe tribal com sprite original detalhado em seis poses e ataque elástico.
+- **Testes físicos:** além das 136 direções de portas, a suíte de navegador executa gravidade real e transição por todas as 33 saídas inferiores, sem teleporte por código.
+- **Testes:** regressão V8, sintaxe V9, browser Chromium com 136 transições direcionais, 33 descidas pela física real e combate à lacraia.
 
 ## Arquivos novos
 
@@ -27,6 +30,7 @@ Acesse `http://localhost:8765/`. O jogo continua em HTML5 Canvas e usa o motor `
 |---|---|
 | `scenario_room1_v9.js` | Colisões e descidas, variações de sala, comportamento dos insetos e IA da lacraia |
 | `scenario_room1_v9_visual.js` | Pixéis e texturas próprios, parallax, sprites de insetos, lacraia e sapo tribal |
+| `scenario_room1_v9_backdrop.js` | Pixel art de sete biomas em camadas de parallax pré-renderizadas |
 | `scenario_room1_v9_fx.js` | Feedback de golpes, efeitos de poderes e testes disponíveis em `?dev=1` |
 | `tests/area1-v9.test.cjs` | Verificações estáticas e de preservação |
 | `tests/browser-v9.cjs` | Testes de carregamento, navegação e combate em Chromium |
