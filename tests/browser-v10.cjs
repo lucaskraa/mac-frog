@@ -31,6 +31,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   const terrain=await page.evaluate(()=>({themes:window.MacFrogV10Terrain.themes.length,materials:window.MacFrogV10Terrain.materials.length,tiles:window.MacFrogV10Terrain.textureCount()}));
   assert.equal(terrain.themes,7);
   assert.equal(terrain.materials,4);
+  await page.waitForFunction(()=>window.MacFrogV10Parallax&&window.MacFrogV10Parallax.ready(),null,{timeout:10000});
+  assert.equal((await page.evaluate(()=>window.MacFrogV10Parallax.assets())).length,4);
   assert(terrain.tiles>=6,'Detailed pixel art terrain never rendered');
   // Check authored art in structurally different biomes rather than only in the first room.
   for(const room of ['mina','templo','aqueduto']){
