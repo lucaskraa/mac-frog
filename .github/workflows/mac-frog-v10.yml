@@ -35,6 +35,17 @@ jobs:
           node tests/browser-v9.cjs
       - name: Run V10 keyboard, animations and 8-form combat test
         run: node tests/browser-v10.cjs
+      - name: Build self-contained single HTML preview
+        run: python3 scripts/build_standalone_v10.py
+      - name: Test offline HTML in headless Chromium
+        run: node tests/browser-standalone-v10.cjs
+      - name: Upload playable beta HTML
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-frog-v10-jogavel-beta
+          path: dist/mac-frog-v10-jogavel.html
+          if-no-files-found: error
       - name: Upload screenshots of real browser gameplay
         if: always()
         uses: actions/upload-artifact@v4
