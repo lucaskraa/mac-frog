@@ -116,14 +116,16 @@
     for(const [id,r] of Object.entries(rooms))for(const ex of r.exits) {
       if(!rooms[ex.dest])continue;
       const key=[id,ex.dest].sort().join("~");if(drawn.has(key))continue;drawn.add(key);
-      if(!full&&!A1.discovered.has(id)&&!A1.discovered.has(ex.dest))continue;
+      // Never disclose undiscovered world topology, even with the large map open.
+      if(!A1.discovered.has(id)&&!A1.discovered.has(ex.dest))continue;
       const a=loc(r),b=loc(rooms[ex.dest]);
       ctx.strokeStyle=ex.requiresWater?"#599cba":"#647a78";ctx.lineWidth=full?8:3;
       ctx.globalAlpha=.75;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1;
     }
     for(const [id,r] of Object.entries(rooms)){
       const explored=A1.discovered.has(id);
-      if(!full&&!explored&&!r.exits.some(ex=>A1.discovered.has(ex.dest)))continue;
+      // Discover adjacent silhouettes only; distant unexplored rooms remain hidden.
+      if(!explored&&!r.exits.some(ex=>A1.discovered.has(ex.dest)))continue;
       const p=loc(r),tall=r.height>1450;
       const rw=stepX*(tall?.48:.81),rh=stepY*(tall?.96:.55);
       ctx.fillStyle=explored?r.biome[2]:"#1a2b34";ctx.globalAlpha=explored?1:.44;
@@ -155,10 +157,13 @@
     ctx.fillText(r.name,20,24);
     ctx.font="12px sans-serif";ctx.fillStyle="#9ec1b3";
     ctx.fillText("ÁREA 1",20,63);
+    // Keep health and map label inside top header, away from the minimap at y=72.
     ctx.textAlign="right";ctx.fillStyle="#d4e6e4";ctx.fillText("M: MAPA",WIDTH-22,25);
-    ctx.fillStyle="#182830";ctx.fillRect(WIDTH-215,55,180,12);
-    ctx.fillStyle=hp>.3?"#8ebe9e":"#be826d";ctx.fillRect(WIDTH-215,55,180*hp,12);
-    ctx.fillStyle="#c3d0ce";ctx.fillText("VIDA "+mac.hp+"/"+mac.maxHp,WIDTH-35,85);
+    ctx.font="12px sans-serif";
+    const barX=Math.max(200,WIDTH-380), barW=140;
+    ctx.textAlign="left";ctx.fillStyle="#c3d0ce";ctx.fillText("VIDA "+mac.hp+"/"+mac.maxHp,barX-82,24);
+    ctx.fillStyle="#182830";ctx.fillRect(barX,20,barW,11);
+    ctx.fillStyle=hp>.3?"#8ebe9e":"#be826d";ctx.fillRect(barX,20,barW*hp,11);
     if(checkpointMessageTimer>0){
       ctx.textAlign="left";ctx.fillStyle="#a3dcb0";ctx.fillText("CHECKPOINT SALVO",20,88);
     }
