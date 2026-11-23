@@ -223,28 +223,59 @@ a1DrawEnemy=function(e){
 // Segmented centipede: body motion animates independently of the attack hitbox.
 function miniDraw(){
  const b=v9.mini;if(!b||!b.alive||A1.node!=="mina")return;
- const cx=b.x+b.w/2,y=b.y;
+ const s=Math.sin, t=v9.time, scale=1;
  ctx.save();
- const dir=b.dir;
+ ctx.imageSmoothingEnabled=false;
+ // Segmented chitin with rhythmic locomotion: separate armor, body, legs and luminescence.
  for(let i=7;i>=0;i--){
-   const x=b.x+13+i*20;
-   const raise=Math.round(Math.sin(v9.time*8-i*.75)*6);
-   const cy=y+42+raise;
-   ctx.fillStyle=b.flash>0?"#d1ffe4":i%2?"#483d52":"#625061";
-   ctx.fillRect(x,cy-18,24,39);ctx.fillStyle="#89705c";ctx.fillRect(x+3,cy-15,18,11);
-   ctx.fillStyle="#66a69a";ctx.fillRect(x+6,cy-11,7,5);
-   ctx.fillStyle="#2b2934";ctx.fillRect(x+2,cy+18,7,17+(i%2)*5);
-   ctx.fillRect(x+16,cy+19,7,16+((i+1)%2)*6);
+   const step=s(t*9-i*.72);
+   const wobble=Math.round(step*4);
+   const x=Math.round(b.x+13+i*20);
+   const y=Math.round(b.y+42+wobble);
+   const fill=b.flash>0?"#e5fff0":i%2?"#3f364c":"#554357";
+   ctx.fillStyle="#242532";ctx.fillRect(x-1,y-12,26,34);
+   ctx.fillStyle=fill;ctx.fillRect(x+1,y-20,24,32);
+   ctx.fillStyle=i%2?"#916d6b":"#a38569";ctx.fillRect(x+3,y-20,18,7);
+   ctx.fillStyle="#2f293a";ctx.fillRect(x+2,y+10,20,9);
+   // Thin armor grooves and individual scaled ridges.
+   ctx.fillStyle="#c2a183";ctx.fillRect(x+4,y-17,2,9);
+   ctx.fillStyle="#74566d";ctx.fillRect(x+18,y-14,3,13);
+   ctx.fillStyle="#70cbb3";ctx.fillRect(x+7,y-13,9,3);
+   ctx.fillStyle="#426b67";ctx.fillRect(x+9,y-10,5,2);
+   // Legs alternate their phase like a moving wave, rather than bouncing together.
+   const stride=Math.round(step*6);
+   ctx.fillStyle="#2e2934";
+   ctx.fillRect(x+2,y+12,5,12);
+   ctx.fillRect(x-2+stride,y+21,8,7);
+   ctx.fillRect(x+17,y+11,5,13);
+   ctx.fillRect(x+17-stride,y+23,9,6);
+   ctx.fillStyle="#a78c70";
+   ctx.fillRect(x+4,y+15,2,6);ctx.fillRect(x+18,y+15,2,6);
  }
- const hx=dir<0?b.x-5:b.x+b.w-40;
- ctx.fillStyle=b.flash>0?"#ebffe8":"#514351";ctx.fillRect(hx,y+11,50,57);
- ctx.fillStyle="#8c6c55";ctx.fillRect(hx+8,y+13,34,14);
- ctx.fillStyle="#6bd8c0";ctx.fillRect(hx+(dir<0?10:30),y+33,8,7);
- ctx.fillStyle="#eddf9f";ctx.fillRect(hx+(dir<0?0:40),y+54,11,13);
+ // Head has an articulated mouth, pincers, antennae and light-reflective eyes.
+ const hx=Math.round(b.dir<0?b.x-5:b.x+b.w-40), hy=Math.round(b.y+8);
+ ctx.fillStyle="#2a2936";ctx.fillRect(hx-5,hy+12,58,58);
+ ctx.fillStyle=b.flash>0?"#ecfff2":"#58465b";ctx.fillRect(hx+1,hy+5,47,54);
+ ctx.fillStyle="#98745d";ctx.fillRect(hx+8,hy+6,31,12);
+ ctx.fillStyle="#b99373";ctx.fillRect(hx+10,hy+5,25,5);
+ ctx.fillStyle="#322c38";ctx.fillRect(hx+10,hy+35,30,15);
+ ctx.fillStyle="#dfac7b";ctx.fillRect(hx+6,hy+45,12,13);ctx.fillRect(hx+34,hy+45,12,13);
+ ctx.fillStyle="#e8cd9a";ctx.fillRect(hx+9,hy+46,5,10);ctx.fillRect(hx+39,hy+46,5,10);
+ const eyeX=b.dir<0?hx+9:hx+34;
+ ctx.fillStyle="#7ce1c0";ctx.fillRect(eyeX,hy+22,9,7);
+ ctx.fillStyle="#d9fff1";ctx.fillRect(eyeX+2,hy+23,3,3);
+ ctx.strokeStyle="#835a70";ctx.lineWidth=3;
+ ctx.beginPath();ctx.moveTo(hx+12,hy+8);ctx.lineTo(hx-8,hy-11+s(t*4)*3);
+ ctx.moveTo(hx+35,hy+8);ctx.lineTo(hx+56,hy-17+s(t*4+1)*3);ctx.stroke();
+ // Telegraph makes the actual charge attack predictable, including during phase two.
  if(b.state==="warn"){
-   ctx.strokeStyle="#f0b56d";ctx.lineWidth=4;
-   const x=dir<0?b.x-270:b.x+b.w;
-   ctx.strokeRect(x,b.y+25,270,65);
+   const reach=b.phase===2?330:270;
+   const left=b.dir<0?b.x-reach:b.x+b.w;
+   ctx.fillStyle="rgba(246,162,89,.14)";ctx.fillRect(left,b.y+24,reach,73);
+   ctx.strokeStyle="#f4ad71";ctx.lineWidth=3;
+   ctx.strokeRect(left,b.y+24,reach,73);
+   ctx.fillStyle="#ffd1a0";
+   for(let i=12;i<reach;i+=32)ctx.fillRect(left+i,b.y+85,14,4);
  }
  ctx.restore();
 }
@@ -442,6 +473,17 @@ draw=function(){
    ctx.strokeStyle="#c5ad7e";ctx.strokeRect(x,HEIGHT-48,w,22);
    ctx.fillStyle="#e8d9b2";ctx.font="bold 14px sans-serif";ctx.textAlign="center";
    ctx.fillText("LACRAIA DAS PROFUNDEZAS",WIDTH/2,HEIGHT-58);
+ }
+ if(v9.rewardNotice&&v9.rewardNotice.life>0){
+   ctx.save();
+   const alpha=Math.min(1,v9.rewardNotice.life*1.6);
+   ctx.globalAlpha=alpha;
+   const w=Math.min(WIDTH-60,390),x=(WIDTH-w)/2;
+   ctx.fillStyle="rgba(8,29,26,.88)";ctx.fillRect(x,80,w,42);
+   ctx.strokeStyle="#9fdac0";ctx.lineWidth=2;ctx.strokeRect(x,80,w,42);
+   ctx.fillStyle="#dbffe8";ctx.font="bold 15px sans-serif";ctx.textAlign="center";
+   ctx.fillText(v9.rewardNotice.text,WIDTH/2,106);
+   ctx.restore();
  }
  if(v9.fade>0){
    ctx.fillStyle="rgba(5,16,19,"+Math.min(.38,v9.fade*1.5)+")";
