@@ -292,6 +292,7 @@ a1BuildRoomCache=function(){
  }
  A1.roomCacheDirty=false;
 };
+A1.roomCacheDirty=true;
 window.MacFrogV10Terrain=Object.freeze({
  version:"10.1",themes:Object.keys(PALETTES),materials:["stone","wood","moss","shrine"],
  textureCount:()=>cache.size,
