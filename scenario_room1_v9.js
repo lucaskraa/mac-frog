@@ -6,7 +6,9 @@ const rooms=A1.rooms, TILE=96, storageKey="mac_frog_v9_boss";
 const V9={version:"9.0",time:0,particles:[],fade:0,transition:null,mini:null,kills:0};
 window.MacFrogV9State=V9;
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
-const overlap=(a,b)=>a&&b&&a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;
+const overlap=(a,b)=>a&&b&&
+ a.x<b.x+(b.width??b.w)&&a.x+(a.width??a.w)>b.x&&
+ a.y<b.y+(b.height??b.h)&&a.y+(a.height??a.h)>b.y;
 function readMini(){
  try{return localStorage.getItem(storageKey)==="defeated";}catch(_){return false;}
 }
