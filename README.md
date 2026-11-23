@@ -1,34 +1,34 @@
-# Mac Frog — Metroidvania (protótipo V6)
+# Mac Frog — Metroidvania (Área 1, V7)
 
-> Desenvolvimento experimental na branch `feature/metroidvania-map-v6`. A versão original está preservada em `main`.
+O jogo conserva **o personagem, os poderes, os golpes e as animações originais** dentro de `game_v25.html`, enquanto a Área 1 recebe um novo projeto de exploração.
 
-## O que foi alterado
+## Como acessar
 
-- **43 salas** conectadas por **69 passagens bidirecionais**, incluindo caminhos verticais, circuitos e atalhos.
-- O novo mapa de exploração usa **formas geométricas simples** para que o layout seja testado antes de investir em sprites de cenário.
-- A tecla **M** abre/fecha o mapa completo; o minimapa permanece no HUD.
-- Algumas portas exigem o **poder de água** e o portão final mantém a saída para a próxima área.
-- A lógica principal de personagem, animações, golpes e inimigos ainda vem do jogo original `game_v25.html`; os sprites animados de inimigos continuam salvos em `assets/gothicvania-swamp/`.
-- O arquivo `scenario_room1_v5.js` e os demais recursos anteriores foram preservados.
+Abra [Mac Frog](https://lucaskraa.github.io/mac-frog/) (após a publicação da atualização). No jogo, pressione **M** para abrir/fechar o mapa completo; com o mapa aberto, a ação é pausada.
 
-## Organização e execução
+## Nova estrutura
 
-- `index.html` — inicia o jogo e injeta o novo cenário.
-- `game_v25.html` — motor original, sprites/animações do personagem e poderes; **não substituído**.
-- `scenario_room1_v6.js` — nova definição das salas, rotas, colisões e mapa.
-- `scenario_room1_v5.js` — implementação anterior, mantida como referência.
-- `assets/` — recursos gráficos originais preservados.
+- 43 salas conectadas por 68 passagens bidirecionais reais.
+- Salas em **5 modelos arquitetônicos**: galerias com rotas superiores, poços verticais, câmaras alagadas, encruzilhadas e fortificações.
+- Diferentes profundidades, pontes, plataformas escalonadas, paredes, lacunas e pontos para agarrar.
+- Mapa com **silhuetas das salas**, mostrando verticalidade, conexões, salas descobertas e bloqueios de habilidade.
+- Rotas que se cruzam e circuitos de retorno. **11 salas de uma região inundada** só são alcançáveis depois de obter o poder de água no Santuário.
+- Sai de `entrada` e mantém o caminho ao portão da próxima área.
+- A arte do cenário foi substituída temporariamente por formas feitas por código; recursos gráficos antigos continuam no repositório para uso posterior.
 
-O `index.html` usa `fetch()` para carregar os arquivos. Execute usando um servidor HTTP, como GitHub Pages, ou um servidor local, em vez de abrir o HTML diretamente com `file://`.
+## Arquivos
 
-## Inspeção no console
+| Arquivo | Função |
+|---|---|
+| `index.html` | Inicializa o motor e injeta V6 + V7 antes do `bootGame()` |
+| `game_v25.html` | Motor e sprites/animações originais, preservados |
+| `scenario_room1_v6.js` | Grafo das salas, combate e integração com o motor |
+| `scenario_room1_v7.js` | Geometria diferenciada, arquitetura visual e novo mapa |
+| `scenario_room1_v5.js` | Versão antiga preservada para recuperação |
+| `assets/` | Recursos gráficos preservados |
 
-```js
-MacFrogMapV6.info()      // versão, sala atual, total, descobertas
-MacFrogMapV6.rooms()     // salas, coordenadas e conexões
-MacFrogMapV6.validate()  // checagem de conexões recíprocas
-```
+## Verificações
 
-## Limitações desta etapa
+Foram executados testes programáticos de sintaxe e construção das 43 salas, reciprocidade das conexões, existência de plataformas nas saídas verticais, acesso ao poder de água antes dos bloqueios, além da execução das funções de desenho com um contexto Canvas simulado.
 
-Esta é uma **primeira implementação da arquitetura de exploração**, e não um mapa final polido. As salas ainda usam uma geometria-base de prototipação, e colisões, alturas alcançáveis, persistência do progresso e integração completa com o motor antigo exigem testes de jogabilidade. O arquivo de 17 MB `game_v25.html` ainda precisa ser modularizado para extrair fisicamente sprites e animações do personagem sem perda de comportamento. Não publique esta branch na `main` antes de testar.
+**Importante:** as verificações automáticas não substituem testes reais de jogabilidade em navegador. A física original, altura dos saltos, ações de agarrar, efeitos visuais e carregamento de partidas salvas ainda precisam ser verificados manualmente. Este projeto permanece um protótipo, não o mapa final de um jogo comercial.
