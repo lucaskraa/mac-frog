@@ -1,3 +1,33 @@
+# Mac Frog V10 — Metamorphosis (DESENVOLVIMENTO, NÃO PUBLICAR)
+
+> A versão pública permanece na `main`. Este trabalho fica na branch `feature/mac-frog-v10-metamorphosis` até cumprir os requisitos completos de arte, animação e gameplay. **Testes automáticos aprovados não significam que a versão final esteja pronta.**
+
+## Implementado na V10
+
+- **Combate:** combo básico de quatro golpes (dois socos e dois chutes), janelas de ataque e testes de dano real contra a Lacraia.
+- **Essências:** oito formas registradas, captura de moscas especiais pela língua, seleção, persistência, energia, dois golpes especiais e uma ultimate por forma; testes de ativação em Chromium.
+- **Transformações:** atlas pixel-art em 8 estados × 8 frames para a forma base e as oito transformações, com silhuetas diferentes e hitboxes base preservadas.
+- **Cenários:** um sistema de tiles com 7 biomas, 4 estilos de material e 4 variantes de textura cada. Pisos de pedra, musgo, madeira e templos possuem bordas, juntas, raízes, musgo, fraturas e molduras de passagens.
+- **Arte gerada original:** atlas de motivos de arquitetura pantanosa e ruínas incorporado ao fundo das salas como mosaicos pixelados.
+- **Recursos CC0:** quatro camadas GothicVania Swamp (Ansimuz) recuperadas para o parallax dos biomas mangue e raízes e pequenos motivos vegetais do tileset original. Crédito em `ASSET_CREDITS.md`.
+- **Inimigos e mini-boss:** atlas PNG transparente com quatro frames de cada besouro, larva, mosca e Lacraia. A lógica dos ataques, avisos e colisões permanece no sistema da V9.
+- **Regressões:** continuam os testes da V8 e V9, inclusive 136 direções de portas e 33 descidas pela gravidade.
+- **Ferramentas de teste:** `tests/area1-v10.test.cjs`, `tests/browser-v10.cjs`, workflow `.github/workflows/mac-frog-v10.yml`. O Chromium gera capturas de biomas, formas e chefes.
+
+## Pendências que bloqueiam o lançamento
+
+- [ ] Redesenhar a arte de todas as oito transformações com animações frame a frame específicas para corrida, pulo, socos, chutes, dois especiais, ultimate, dano e morte.
+- [ ] Criar e validar spritesheets detalhadas e animações exclusivas para todos os inimigos restantes.
+- [ ] Redesenhar o chefão sapo tribal e completar testes manuais de todas as fases e padrões de ataque.
+- [ ] Substituir os cenários ainda genéricos em **todas** as salas por composições de pixel art mais ricas, com biomas e pontos de interesse únicos.
+- [ ] Realizar campanhas completas com progressão normal, reentrada em salas, coleta de poderes, saves e derrotas de bosses sem usar comandos de depuração.
+- [ ] Revisar legibilidade dos elementos de HUD, efeitos e animações, corrigindo problemas identificados em capturas reais.
+- [ ] Validar balanceamento e desempenho em computadores de desempenho limitado.
+
+**Critério:** não misturar na `main` apenas pelo número de testes passando. O jogo exige revisão visual e uma campanha completa jogada do início ao fim.
+
+---
+
 # Mac Frog V9 — reconstrução visual e combates (branch experimental)
 
 > **A V8 publicada continua na `main`.** Esta V9 está sendo desenvolvida em `feature/mac-frog-v9`. Não mesclar sem verificar o resultado de `Mac Frog V9 verification` e jogar uma campanha completa.
