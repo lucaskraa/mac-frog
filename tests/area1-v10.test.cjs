@@ -5,15 +5,17 @@ const root=path.join(__dirname,'..');
 const read=n=>fs.readFileSync(path.join(root,n),'utf8');
 test('V10 compiles and loads after V9 in a single consistent boot path',()=>{
  const idx=read('index.html');
- const a=read('scenario_room1_v10.js'),b=read('scenario_room1_v10_visual.js'),terrain=read('scenario_room1_v10_terrain.js');
+ const a=read('scenario_room1_v10.js'),b=read('scenario_room1_v10_visual.js'),terrain=read('scenario_room1_v10_terrain.js'),parallax=read('scenario_room1_v10_parallax.js');
  assert.doesNotThrow(()=>new Function(a));
  assert.doesNotThrow(()=>new Function(b));
  assert.doesNotThrow(()=>new Function(terrain));
+ assert.doesNotThrow(()=>new Function(parallax));
  assert(a.length>10000&&b.length>8000&&terrain.length>10000);
  assert(idx.indexOf("scenario_room1_v9_fx.js")<idx.indexOf("scenario_room1_v10.js"));
  assert(idx.indexOf("scenario_room1_v10.js")<idx.indexOf("scenario_room1_v10_visual.js"));
  assert(idx.includes("+ coreV10 + '\\n\\n' + artV10 +"));
  assert(idx.includes("+ artV10 + '\\n\\n' + terrainV10 +"));
+ assert(idx.includes("+ terrainV10 + '\\n\\n' + parallaxV10 +"));
 });
 test('the original V9, V8 and 17MB legacy game are preserved',()=>{
  for(const f of ['scenario_room1_v9.js','scenario_room1_v9_visual.js','scenario_room1_v9_fx.js',
@@ -47,4 +49,11 @@ test('world art uses material-specific, cached pixel tiles without changing coll
  assert(s.includes('a1BuildRoomCache=function()'));
  assert(s.includes('roomCacheDirty=false'));
  assert(!s.includes('solids.push('),'visual pass must not mutate collision shapes');
+});
+
+test('reuses the verified CC0 swamp multi-layer atlases for two appropriate biomes',()=>{
+ const p=read('scenario_room1_v10_parallax.js');
+ for(const key of ['background','mid-layer-01','mid-layer-02','trees'])assert(p.includes(key));
+ assert(p.includes('CC0 1.0'));
+ assert(!p.includes('solids.push('));
 });
