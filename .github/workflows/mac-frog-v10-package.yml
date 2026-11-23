@@ -1,0 +1,46 @@
+name: Mac Frog V10 Offline Preview Build
+on:
+  push:
+    branches: [feature/mac-frog-v10-metamorphosis]
+    paths:
+      - 'scripts/build_standalone_v10.py'
+      - '.github/workflows/mac-frog-v10-package.yml'
+      - 'index.html'
+      - 'game_v25.html'
+      - 'scenario_room1_v*.js'
+      - 'area1_*.js'
+      - 'assets/**'
+  workflow_dispatch:
+jobs:
+  package:
+    name: Package playable HTML
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check core V8/V9/V10 source regressions
+        run: |
+          node --test tests/area1-v8.test.cjs
+          node --test tests/area1-v9.test.cjs
+          node --test tests/area1-v10.test.cjs
+      - name: Build a standalone playable game
+        run: python3 scripts/build_standalone_v10.py
+      - name: Verify HTML bundle manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("dist/mac-frog-v10-jogavel.html")
+          s=p.read_text(encoding="utf-8")
+          assert p.stat().st_size>17_000_000
+          for name in ("game_v25.html", "scenario_room1_v10.js",
+                       "scenario_room1_v10_terrain.js", "scenario_room1_v10_enemies.js",
+                       "assets/gothicvania-swamp/tileset.b64"):
+              assert name in s, name
+          print("V10_BUNDLE_MANIFEST_OK",p.stat().st_size)
+          PY
+      - name: Upload playable offline preview (beta)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-frog-v10-html-beta-preview
+          path: dist/mac-frog-v10-jogavel.html
+          if-no-files-found: error
