@@ -514,7 +514,8 @@ draw=function(){
  oldDraw();
  if(currentRoom===0){
    ctx.save();ctx.translate(-Math.round(camera.x),-Math.round(camera.y));
-   miniDraw();
+   if(window.MacFrogV10EnemyArt?.ready())window.MacFrogV10EnemyArt.drawMini(v9.mini);
+   else miniDraw();
    ctx.imageSmoothingEnabled=false;
    for(const p of v9.particles){
      ctx.globalAlpha=Math.min(1,Math.max(0,p.life*2.5));ctx.fillStyle=p.color;
