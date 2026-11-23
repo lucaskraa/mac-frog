@@ -26,11 +26,20 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
     assert.equal(form.specials.length,2,form.id+' specials');
     assert(form.ultimate&&form.passive,'Missing ultimate/passive '+form.id);
   }
-  await page.waitForFunction(()=>window.MacFrogV10Terrain&&window.MacFrogV10Terrain.textureCount()>5,null,{timeout:5000});
+  await page.waitForFunction(()=>window.MacFrogV10Terrain&&window.MacFrogV10Terrain.textureCount()>5&&
+    window.MacFrogV10Terrain.licensedPixelsReady()&&window.MacFrogV10Terrain.motifsReady(),null,{timeout:10000});
   const terrain=await page.evaluate(()=>({themes:window.MacFrogV10Terrain.themes.length,materials:window.MacFrogV10Terrain.materials.length,tiles:window.MacFrogV10Terrain.textureCount()}));
   assert.equal(terrain.themes,7);
   assert.equal(terrain.materials,4);
   assert(terrain.tiles>=6,'Detailed pixel art terrain never rendered');
+  // Check authored art in structurally different biomes rather than only in the first room.
+  for(const room of ['mina','templo','aqueduto']){
+    await page.evaluate(id=>window.MacFrogV10Dev.travel(id),room);
+    await page.waitForTimeout(180);
+    await shoot('v10-environment-'+room);
+  }
+  await page.evaluate(()=>window.MacFrogV10Dev.travel('entrada'));
+  await page.waitForTimeout(180);
   await shoot('v10-base');
   await page.keyboard.press('j');
   const first=await page.evaluate(()=>window.MacFrogV10.info());
