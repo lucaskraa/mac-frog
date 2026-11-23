@@ -8,7 +8,7 @@ const colors={base:["#5a8352","#a7c07b","#d3be87"],water:["#2f7181","#63bac2","#
  tree:["#326f4a","#87c089","#d4dca0"],glass:["#5c8f87","#b5e8c7","#ecf3d9"],
  colossal:["#4c6242","#ac9964","#ead099"],ice:["#456b91","#8cc5dc","#e9f4fc"],
  shadow:["#40466e","#9586bb","#c9d3f0"]};
-const states=["idle","run","punch","kick","special","ultimate","transform","hurt"];
+const states=["idle","run","punch","kick","special","ultimate","transform","hurt","jump","fall","land"];
 const W=72,H=88,FRAMES=8,atlases=new Map();
 const fill=(c,col,x,y,w,h)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
 function poly(c,col,pts){c.fillStyle=col;c.beginPath();c.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]);c.closePath();c.fill();}
@@ -16,10 +16,12 @@ function frog(c,form,action,frame){
  const p=colors[form]||colors.base;
  const phase=(frame/FRAMES)*Math.PI*2;
  const run=action==="run",punch=action==="punch",kick=action==="kick",special=action==="special",ultimate=action==="ultimate";
- const bob=Math.round(Math.sin(phase)*(run?4:2)),stretch=action==="transform"?Math.round(Math.sin(Math.PI*(frame+1)/9)*6):0;
- const leg=Math.round(Math.sin(phase)*(run?10:2));
+ const jump=action==="jump",fall=action==="fall",land=action==="land";
+ const bob=jump?-4:fall?2:land?Math.round((8-frame)*.6):Math.round(Math.sin(phase)*(run?4:2)),
+ stretch=action==="transform"?Math.round(Math.sin(Math.PI*(frame+1)/9)*6):0;
+ const leg=jump?-8:fall?5:land?0:Math.round(Math.sin(phase)*(run?10:2));
  const arm=punch?Math.round(Math.sin(Math.min(1,frame/5)*Math.PI)*16):
-  special?Math.round(Math.sin(Math.PI*(frame+1)/9)*8):3;
+  special?Math.round(Math.sin(Math.PI*(frame+1)/9)*8):jump?10:fall?-2:3;
  const wide=form==="colossal",thin=form==="wind"||form==="shadow",membranes=form==="water"||form==="wind";
  const width=wide?49:thin?32:39, left=36-width/2;
  const mainY=25+bob-stretch, bottom=71+bob+stretch;
@@ -98,19 +100,29 @@ function get(form,action){
 }
 const initialForms=["base","water","wind","poison","tree","glass","colossal","ice","shadow"];
 for(const form of initialForms)for(const action of states)get(form,action);
+let landingTimer=0,lastGrounded=mac.grounded;
+const oldUpdateForAnim=update;
+update=function(dt){
+ oldUpdateForAnim(dt);
+ if(!lastGrounded&&mac.grounded)landingTimer=.16;
+ else landingTimer=Math.max(0,landingTimer-dt);
+ lastGrounded=mac.grounded;
+};
 const oldDraw=drawMacSprite;
 drawMacSprite=function(){
  if(mac.dead||currentRoom!==0&&currentRoom!==1){oldDraw();return;}
  const a=core.attack;
  const transforming=core.transformTimer>0;
- if(core.form==="base"&&!transforming&&!a){oldDraw();return;}
+ // Use the same original V10 frog silhouette for idle, movement and attacks.
+ // Legacy atlases are still preserved and used as fallback during death.
  const form=transforming?(core.nextForm||core.form):core.form;
  const action=transforming?"transform":a?(a.type==="combo"?(a.kick?"kick":"punch"):a.type==="ultimate"?"ultimate":"special"):
-  Math.abs(mac.vx)>35&&mac.grounded?"run":mac.vy< -60?"run":"idle";
+   !mac.grounded?(mac.vy<-60?"jump":"fall"):
+   landingTimer>0?"land":Math.abs(mac.vx)>35?"run":"idle";
  const sprite=get(form,action);
  const progress=transforming?1-core.transformTimer/.42:a?Math.min(1,a.elapsed/a.time):core.time*(action==="run"?13:8)/FRAMES;
  const frame=transforming?Math.floor(progress*FRAMES)%FRAMES:a?Math.min(7,Math.floor(progress*FRAMES)):Math.floor(progress*FRAMES)%FRAMES;
- const scale=2.15; // display 72x88 sprite while preserving low-res pixel grid
+ const scale=1.65; // consistent, legible pixel-scale silhouette with less screen occlusion
  const ww=W*scale,hh=H*scale;
  const x=Math.round(mac.x+mac.width/2-ww/2),y=Math.round(mac.y+mac.height-hh+13);
  ctx.save();ctx.imageSmoothingEnabled=false;
