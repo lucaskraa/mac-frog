@@ -1,61 +1,50 @@
-# Mac Frog — reconstrução Metroidvania (V8)
+# Mac Frog V9 — reconstrução visual e combates (branch experimental)
 
-Jogo 2D em HTML5 Canvas. Esta branch preserva o motor original de animação e combate e substitui a geometria repetitiva da Área 1 por salas feitas com mapas de tiles individuais.
+> **A V8 publicada continua na `main`.** Esta V9 está sendo desenvolvida em `feature/mac-frog-v9`. Não mesclar sem verificar o resultado de `Mac Frog V9 verification` e jogar uma campanha completa.
 
-## Executar
-
-Abra a versão publicada em [GitHub Pages](https://lucaskraa.github.io/mac-frog/) depois que esta branch for validada e integrada, ou execute um servidor estático local dentro do repositório:
+## Execução local
 
 ```bash
 python3 -m http.server 8765
 ```
 
-Acesse http://localhost:8765/. O HTML usa `fetch()`; abrir por `file://` não é suportado.
+Acesse `http://localhost:8765/`. O jogo continua em HTML5 Canvas e usa o motor `game_v25.html`. O carregamento em `index.html` injeta o núcleo V8 e depois os três módulos V9.
 
-**Controles conhecidos:** A/D ou setas para movimentar; W, seta para cima ou Espaço para pular; C para língua/agarrar; Z para ataque normal; M para mapa; Shift para correr. S ou seta para baixo abre saídas inferiores quando o personagem estiver sobre o portal.
+## O que a V9 implementa
 
-## Estrutura
+- **Construção visual:** pedras pixeladas, padrões de solo, musgo e madeira produzidos por código, com contornos de plataformas e parallax de ruínas/raízes sem cópia de obras comerciais.
+- **Vãos revisados:** vários setores de travessia passam a ter solo contínuo. Poços perigosos ficam concentrados em regiões específicas.
+- **Descidas físicas:** salas que têm saída inferior recebem uma abertura real no piso; o personagem precisa cair por ela para mudar de sala. A chegada é posicionada em área desobstruída.
+- **Inimigos:** moscas, larvas e besouros recebem sprites pixelados originais gerados em pequenos canvases e variações de movimento. As imagens originais de V8 e o motor de combate continuam recuperáveis.
+- **Mini-boss:** Lacraia das Profundezas nas Minas, com corpo de oito segmentos, aviso de investida, duas velocidades/fases, barra de vida e derrota registrada no armazenamento local.
+- **Chefe final:** o sapo tribal usa o boss e as hitboxes do motor original na Área 2, agora com novo corpo pixelado e ataque elástico extra na segunda fase.
+- **Mac Frog:** atlases de movimento e ataques originais preservados; partículas adicionais para dano, aterrissagem, água, vento e transições.
+- **Testes:** regressão V8, sintaxe V9 e browser Chromium com verificação das 136 direções do grafo e teste de derrota da lacraia.
 
-| Arquivo | Responsabilidade |
+## Arquivos novos
+
+| Arquivo | Função |
 |---|---|
-| `game_v25.html` | Motor original, 5 atlases WebP embutidos, animações, habilidades e combate; preservado |
-| `scenario_room1_v6.js` | Compatibilidade com o motor, inimigos, entidades e grafo de conexão |
-| `area1_blueprints_v8.js` | 43 salas com geometrias de tiles escritas separadamente |
-| `area1_connectors_v8.js` | 92 plataformas corretivas explícitas, definidas após teste de alcançabilidade |
-| `scenario_room1_v8.js` | Conversão dos tiles em colisões, portas, câmera, checkpoints e save V8 |
-| `scenario_room1_v8_visual.js` | Renderização provisória do ambiente, portas, minimapa/mapa e HUD |
-| `index.html` | Carregamento do motor original + scripts V8 na ordem correta |
-| `tools/extract-atlases.cjs` | Extração reversível dos cinco atlases WebP originais |
-| `tests/area1-v8.test.cjs` | Testes estáticos, topologia, progressão, renderização simulada e spawns |
-| `tests/browser-smoke.cjs` | Teste real no Chromium de carregamento, movimentação e mapa |
+| `scenario_room1_v9.js` | Colisões e descidas, variações de sala, comportamento dos insetos e IA da lacraia |
+| `scenario_room1_v9_visual.js` | Pixéis e texturas próprios, parallax, sprites de insetos, lacraia e sapo tribal |
+| `scenario_room1_v9_fx.js` | Feedback de golpes, efeitos de poderes e testes disponíveis em `?dev=1` |
+| `tests/area1-v9.test.cjs` | Verificações estáticas e de preservação |
+| `tests/browser-v9.cjs` | Testes de carregamento, navegação e combate em Chromium |
+| `.github/workflows/mac-frog-v9.yml` | Integração contínua da V9 |
 
-V7 e os cenários anteriores permanecem no repositório como histórico recuperável, mas não são executados pelo novo `index.html`.
+## Limitações e trabalho restante
 
-## Exploração
+A V9 ainda **não representa o polimento final de Dead Cells**: os sprites de insetos e os padrões de cenário são pixel art gerada por código, ainda com espaço para direção artística detalhada. A física de todas as plataformas precisa de uma campanha manual longa, além dos testes automatizados de portas. O chefe tribal aproveita os ataques existentes, mas a batalha integral também precisa de teste humano.
 
-- **43 salas** e **68 conexões bidirecionais** no grafo atual;
-- **13 salas verticais** com mais de uma tela de altura;
-- Portas laterais, superiores e inferiores com coordenadas próprias;
-- Diferenciação entre salas, abismos, plataformas, câmaras inundadas e âncoras para língua;
-- Uma região de **11 salas** bloqueada por habilidade da água;
-- O **Santuário da Água** é alcançável antes de adquirir a habilidade;
-- HUD mais limpo, mapa com descoberta progressiva e sala atual;
-- Estado de exploração V8 salvo separadamente para não destruir o save legado.
+Não foram removidos `game_v25.html`, os atlases WebP originais, a V8 ou outros recursos e versões anteriores. O armazenamento da derrota da lacraia usa a chave `mac_frog_v9_boss`, separada da chave do save V8.
 
-## Separar os sprites originais
-
-```bash
-node tools/extract-atlases.cjs
-```
-
-O comando escreve cinco imagens **WebP** em `assets/extracted/`, junto de um manifesto com hashes SHA-256 e metadados das animações. A extração não altera os bytes originais; para evitar duplicação permanente de ~13 MB, o GitHub Actions anexa essas imagens como artefato ZIP em vez de adicioná-las ao código-fonte. O motor continua usando os atlases originais embutidos.
-
-## Verificação
+## Verificar
 
 ```bash
 node --test tests/area1-v8.test.cjs
+node --test tests/area1-v9.test.cjs
+# Com servidor HTTP local e Playwright instalado:
+node tests/browser-v9.cjs
 ```
 
-O fluxo [Mac Frog V8 verification](https://github.com/lucaskraa/mac-frog/actions) executa esses testes, extrai os atlases e também inicia o jogo real num Chromium headless com capturas.
-
-**Observação:** a V8 é um avanço importante de arquitetura, mas não é uma certificação de que toda a campanha foi completada. Salas e transições precisam de testes de jogabilidade longa, revisão visual de cada ambiente, progressão de todos os itens, verificação manual de segredos e eventual substituição da arte provisória por cenários finais. Não confunda topologia válida com uma campanha integralmente testada.
+O workflow publica as capturas reais de teste como artefatos do GitHub Actions.
