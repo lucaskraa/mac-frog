@@ -1,0 +1,46 @@
+name: Mac Frog V10 Metamorphosis verification
+on:
+  push:
+    branches:
+      - feature/mac-frog-v10-metamorphosis
+  pull_request:
+    paths:
+      - 'scenario_room1_v10*.js'
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/mac-frog-v10.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run V8 V9 and V10 deterministic tests
+        run: |
+          node --test tests/area1-v8.test.cjs
+          node --test tests/area1-v9.test.cjs
+          node --test tests/area1-v10.test.cjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Run V9 regression and real 33 downward falls
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/mac-frog-v10.log 2>&1 &
+          sleep 2
+          node tests/browser-v9.cjs
+      - name: Run V10 keyboard, animations and 8-form combat test
+        run: node tests/browser-v10.cjs
+      - name: Upload screenshots of real browser gameplay
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-frog-v10-real-screenshots
+          path: |
+            test-results-v9/
+            test-results-v10/
+          if-no-files-found: warn
