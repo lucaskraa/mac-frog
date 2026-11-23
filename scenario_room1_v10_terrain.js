@@ -4,6 +4,15 @@
 (function installMacFrogV10Terrain(){
 "use strict";
 const TS=64, cache=new Map();
+const licensed=new Image();
+licensed.decoding="async";
+let licensedReady=false;
+licensed.onload=()=>{licensedReady=true;A1.roomCacheDirty=true;};
+licensed.onerror=()=>console.warn("V10 CC0 swamp vegetation tile atlas missing; fall back to original procedural pixels");
+fetch("./assets/gothicvania-swamp/tileset.b64",{cache:"force-cache"})
+ .then(r=>{if(!r.ok)throw Error("Missing swamp pixel atlas "+r.status);return r.text();})
+ .then(base64=>licensed.src="data:image/png;base64,"+base64.trim().replace(/\\s+/g,""))
+ .catch(e=>console.warn("V10 optional CC0 vegetation:",e));
 const PALETTES={
   mangue:{rock:["#202a29","#35433c","#536052","#79816a","#b2ad76"],soil:["#201d20","#45392f","#62503b","#85714b","#c1b874"],leaf:["#31593a","#557c4a","#98aa55","#c6ce74"],glow:"#e4b46d",sky:"#0d2625"},
   raizes:{rock:["#1d2c29","#34483b","#4a5d48","#758566","#b0b68b"],soil:["#271e20","#463a2d","#635137","#8d6a40","#c5a86f"],leaf:["#244f37","#46764a","#87ab6b","#d0d995"],glow:"#b7df90",sky:"#0d2924"},
@@ -283,6 +292,35 @@ a1BuildRoomCache=function(){
     platform.style==="moss"?"moss":"stone";
   paintTerrain(c,platform,mat,r,seed+platform.x+(platform.y|0));
  }
+ // Actual CC0 pixel source adds carefully spaced fern and lichen clusters.
+ // This augments the original authored pixels instead of using a stretched image
+ // as a complete platform; only a few plants grow from broad surfaces.
+ if(licensedReady){
+  c.save();c.imageSmoothingEnabled=false;
+  for(const [index,platform] of [...r.platforms,...r.floors].entries()){
+   if(platform.width<180)continue;
+   const count=Math.max(1,Math.floor(platform.width/340));
+   for(let n=0;n<count;n++){
+    const x=platform.x+75+n*(platform.width-130)/count;
+    const y=platform.y-28;
+    if((seed+index+n)%4===0) {
+     c.globalAlpha=.80;
+     c.drawImage(licensed,0,71,68,36,x,y,67,37);
+    }else if((seed+index+n)%5===0){
+     c.globalAlpha=.65;
+     c.drawImage(licensed,152,72,57,39,x,y-3,64,43);
+    }
+   }
+  }
+  if(r.v9Theme==="templo"||r.v9Theme==="cripta"){
+   // Reliefs are embedded in non-colliding background walls only.
+   c.globalAlpha=.26;
+   for(let x=650;x<r.width-100;x+=1100){
+    c.drawImage(licensed,112,0,96,67,x,190,192,134);
+   }
+  }
+  c.restore();
+ }
  if(r.v9Shaft){
   const down=r.exits.find(e=>e.side==="bottom");
   if(down)drawDoorFrame(c,r,down,p);
@@ -295,7 +333,7 @@ a1BuildRoomCache=function(){
 A1.roomCacheDirty=true;
 window.MacFrogV10Terrain=Object.freeze({
  version:"10.1",themes:Object.keys(PALETTES),materials:["stone","wood","moss","shrine"],
- textureCount:()=>cache.size,
+ textureCount:()=>cache.size,licensedPixelsReady:()=>licensedReady,
  validate:()=>({ok:Object.keys(PALETTES).length===7,variants:4,pixelTileSize:TS})
 });
 })();
