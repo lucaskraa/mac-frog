@@ -137,6 +137,9 @@ a1HitFirst=function(box,damage){
    emit(clamp(box.x,mini.x,mini.x+mini.w),mini.y+mini.h*.44,"#9ee5be",5);
    if(mini.hp===0){
      mini.alive=false;mini.state="dead";V9.kills++;saveMini();
+     // A real, immediately useful first-clear reward for defeating the miniboss.
+     mac.hp=Math.min(mac.maxHp,mac.hp+35);
+     V9.rewardNotice={text:"LACRAIA DERROTADA  •  +35 VIDA",life:3.2};
      emit(mini.x+mini.w/2,mini.y+mini.h/2,"#9ee4ca",38);
      V9.fade=.30;
    } else if(mini.hp<mini.maxHp*.50)mini.phase=2;
@@ -148,16 +151,25 @@ const oldEnemies=a1UpdateEnemies;
 a1UpdateEnemies=function(dt){
  oldEnemies(dt);
  if(currentRoom!==0||A1.fullMapOpen)return;
+ const room=rooms[A1.node];
  for(const e of A1.enemies){
    if(!e.alive)continue;
    if(e.role==="mosca"){
-     // Batidas rápidas de asa e deslocamento senoidal na direção do jogador.
-     e.y+=Math.sin(V9.time*9+e.phase)*20*dt;
+     // Flight keeps the classic chase, but never crosses the chamber boundary.
+     e.x=clamp(e.x,30,room.width-e.w-30);
+     e.y=clamp(e.y+Math.sin(V9.time*9+e.phase)*20*dt,30,room.height-e.h-80);
    }else if(e.role==="besouro"){
      const near=Math.abs((mac.x+mac.width/2)-(e.x+e.w/2))<220;
-     if(near&&Math.abs(mac.y-e.y)<110)e.x+=e.dir*36*dt;
+     // Patrol boundaries follow the support platform, not the entire world.
+     if(near&&Math.abs(mac.y-e.y)<110){
+       e.x=clamp(e.x+e.dir*36*dt,e.min,Math.max(e.min,e.max-e.w));
+     }
+     if(e.x<=e.min)e.dir=1;
+     if(e.x+e.w>=e.max)e.dir=-1;
    }else if(e.role==="larva"){
-     e.x+=Math.sin(V9.time*4+e.phase)*7*dt;
+     // The larva's undulation is animated by its sprite, not by bypassing
+     // collision or adding unsupervised sideways movement.
+     e.x=clamp(e.x,e.min,Math.max(e.min,e.max-e.w));
    }
  }
 };
@@ -196,6 +208,7 @@ update=function(dt){
  if(currentRoom===0)updateMini(dt);
  if(prevNode!==A1.node)V9.fade=.21;
  V9.fade=Math.max(0,V9.fade-dt);
+ if(V9.rewardNotice)V9.rewardNotice.life=Math.max(0,V9.rewardNotice.life-dt);
  for(let i=V9.particles.length-1;i>=0;i--){
    const p=V9.particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=450*dt;
    if(p.life<=0)V9.particles.splice(i,1);
@@ -234,7 +247,8 @@ updateBoss=function(dt){
 window.MacFrogV9=Object.freeze({
  info:()=>({version:V9.version,room:A1.node,rooms:Object.keys(rooms).length,
   shafts:Object.values(rooms).filter(r=>!!r.v9Shaft).length,mini:V9.mini&&{hp:V9.mini.hp,state:V9.mini.state},
-  miniDefeated:readMini(),player:{x:mac.x,y:mac.y}}),
+  miniDefeated:readMini(),reward:V9.rewardNotice?.life>0?V9.rewardNotice.text:null,
+  player:{x:mac.x,y:mac.y}}),
  validate:()=>{
   const issues=[];
   for(const [id,r] of Object.entries(rooms)){
