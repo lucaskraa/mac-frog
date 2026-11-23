@@ -104,13 +104,19 @@ function spawnFlies(){
 }
 let lastNode=A1.node,lastRoom=currentRoom;
 function flyHit(f){
+ if(!tongue.active)return false;
  const hit={x:f.x-18,y:f.y-18,width:36,height:36};
- if(typeof getTongueHitbox==="function"&&tongue.active){
+ if(typeof getTongueHitbox==="function"){
   const th=getTongueHitbox();
   if(th&&overlap(hit,th))return true;
  }
- // Only the tongue can capture. Physical overlap alone does not grant a power.
- return false;
+ // Input-friendly swept tongue pickup: small vertical grace and realistic
+ // reach prevents low-FPS missed frames while still requiring a tongue action.
+ const origin=typeof getTongueOrigin==="function"?getTongueOrigin():
+   {x:mac.x+mac.width/2,y:mac.y+mac.height*.43};
+ const dx=f.x-origin.x,dy=f.y-origin.y;
+ return Math.abs(dx)<186 && Math.abs(dy)<73 &&
+   (mac.facing<0?dx<=22:dx>=-22);
 }
 const comboBase=TYPES.base.combo;
 function transformedCombo(id,index){
@@ -374,8 +380,12 @@ if(typeof location!=="undefined"&&new URLSearchParams(location.search).get("dev"
    if(!f)throw Error("fly unavailable "+id);
    mac.facing=1;
    mac.x=f.x-87;
-   mac.y=f.y-mac.height*.44;
-   mac.vx=0;mac.vy=0;mac.grounded=false;
+   const room=A1.rooms[A1.node];
+   const support=[...room.platforms,...room.floors]
+      .filter(p=>p.x<=f.x&&p.x+p.width>=f.x&&p.y>f.y&&p.y-f.y<260)
+      .sort((a,b)=>a.y-b.y)[0];
+   mac.y=support?support.y-mac.height-2:f.y-mac.height*.72;
+   mac.vx=0;mac.vy=0;mac.grounded=!!support;
    snapCameraToMac();
    return {id,fly:{x:f.x,y:f.y},mac:{x:mac.x,y:mac.y},unlocked:state.unlocked.has(id)};
   },
