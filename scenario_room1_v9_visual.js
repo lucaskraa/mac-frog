@@ -278,6 +278,142 @@ drawBoss=function(){
  }
  ctx.restore();
 };
+
+// Final tribal temple: restore atmosphere and coherent surfaces in legacy Area 2.
+const baseWorldGeometry=drawWorldGeometry;
+drawWorldGeometry=function(){
+ if(currentRoom!==1)return baseWorldGeometry();
+ const sky=ctx.createLinearGradient(0,camera.y,0,camera.y+HEIGHT);
+ sky.addColorStop(0,"#131d26");sky.addColorStop(1,"#32413a");
+ ctx.fillStyle=sky;ctx.fillRect(camera.x,camera.y,WIDTH,HEIGHT);
+ ctx.save();ctx.globalAlpha=.32;
+ for(let x=80;x<WORLD_WIDTH;x+=330){
+   const y=ground.y-395;
+   ctx.fillStyle="#1b302f";
+   ctx.fillRect(x,y,74,440);
+   ctx.fillRect(x-28,y+27,126,36);
+   ctx.fillRect(x-21,y+115,113,16);
+   ctx.fillRect(x+16,y-50,42,55);
+   ctx.fillRect(x+26,y-80,23,30);
+   ctx.fillStyle="#385b4d";
+   for(let i=0;i<5;i++)ctx.fillRect(x+(i*13)%75,y+i*49,8,4);
+   ctx.fillStyle="#10241f";
+   ctx.fillRect(x+18,y+135,38,240);
+ }
+ ctx.restore();
+ const c=ctx,tex=texture("templo","stone");
+ const stone=(r,wood=false)=>{
+   if(!r||r.width<=0||r.height<=0)return;
+   c.save();c.fillStyle=c.createPattern(texture("templo",wood?"wood":"stone"),"repeat");
+   c.fillRect(r.x,r.y,r.width,r.height);
+   c.fillStyle=wood?"#a88a62":"#b2a37b";c.fillRect(r.x,r.y,r.width,8);
+   c.fillStyle="#1a292b";c.fillRect(r.x,r.y+r.height-8,r.width,8);
+   if(r.height<=32)for(let x=r.x+10;x<r.x+r.width;x+=37){
+      c.fillStyle="#48493d";c.fillRect(x,r.y+13,16,19);
+   }
+   c.restore();
+ };
+ stone(ground);
+ for(const p of platforms)stone(p,p.style==="wood");
+ for(const w of walls)stone(w);
+ // Handcrafted sigil embedded in the stone altar behind the arena.
+ const x=boss.arenaLeft+220,y=ground.y-245;
+ ctx.save();ctx.globalAlpha=.65;ctx.strokeStyle="#9dbb80";ctx.lineWidth=7;
+ ctx.strokeRect(x-76,y-18,156,175);
+ ctx.strokeRect(x-44,y+13,93,100);
+ ctx.beginPath();ctx.moveTo(x-32,y+50);ctx.lineTo(x,y+14);
+ ctx.lineTo(x+34,y+50);ctx.lineTo(x,y+113);ctx.closePath();ctx.stroke();
+ ctx.restore();
+};
+// Tribal gate replaces the old fluorescent purple wall.
+const previousGate=drawBossGate;
+drawBossGate=function(){
+ if(currentRoom!==1||!boss.active||!boss.alive)return;
+ const g=bossGate;
+ ctx.save();ctx.fillStyle="#1a2e2e";ctx.fillRect(g.x-8,g.y,g.width+16,g.height);
+ ctx.fillStyle="#78634b";ctx.fillRect(g.x-8,g.y,g.width+16,20);
+ ctx.fillRect(g.x-8,g.y+g.height-19,g.width+16,19);
+ ctx.fillStyle="#86be9b";
+ for(let i=0;i<6;i++)ctx.fillRect(g.x+11,g.y+28+i*31,5,18);
+ ctx.strokeStyle="#8aa78b";ctx.lineWidth=4;ctx.strokeRect(g.x-8,g.y,g.width+16,g.height);
+ ctx.restore();
+};
+// More recognizable original pixel sprite for the ancestral frog chief.
+function chiefAtlas(){
+ const cvs=document.createElement("canvas"),c=cvs.getContext("2d");cvs.width=42;cvs.height=56;
+ const p=(color,x,y,w,h)=>{c.fillStyle=color;c.fillRect(x,y,w,h)};
+ p("#263e3c",8,6,26,42);p("#4a795a",4,11,34,30);p("#80a66b",9,16,25,23);
+ p("#b5c580",12,28,18,16);p("#789e66",8,39,27,8);
+ p("#234b48",4,45,14,8);p("#234b48",25,45,13,8);
+ p("#ba865e",10,1,22,5);p("#e2bb72",15,0,13,2);
+ p("#7d553f",7,0,4,11);p("#d3ae64",5,0,3,7);
+ p("#ca965c",34,0,4,11);p("#eed389",36,0,3,6);
+ p("#2c4441",6,12,11,9);p("#2c4441",25,12,11,9);
+ p("#e5cc82",10,15,5,4);p("#e5cc82",28,15,5,4);
+ p("#292c37",12,15,3,3);p("#292c37",29,15,3,3);
+ p("#31443a",17,25,10,4);p("#d7bb80",20,29,7,3);
+ p("#d6ac6c",15,39,16,5);p("#7e574a",17,43,13,8);
+ p("#e6cd92",5,47,11,5);p("#e6cd92",27,47,11,5);
+ for(let i=0;i<5;i++){p("#567b5b",8+i*5,24+i%2*3,3,4);}
+ p("#ba785e",4,30,4,13);p("#ba785e",36,30,4,13);
+ return cvs;
+}
+const tribalSprite=chiefAtlas();
+drawBoss=function(){
+ if(currentRoom!==1||!boss.alive||boss.defeated)return;
+ ctx.save();ctx.imageSmoothingEnabled=false;
+ const w=118,h=158,x=boss.x+boss.width/2-w/2,y=boss.y+boss.height-h;
+ if(boss.hurtTimer>0)ctx.globalAlpha=.55;
+ ctx.drawImage(tribalSprite,x,y,w,h);
+ ctx.globalAlpha=1;
+ if(["punchTelegraph","punchActive","v9TongueWarn","v9Tongue"].includes(boss.state)){
+   const attack=boss.state==="punchActive"||boss.state==="v9Tongue";
+   const range=boss.state.startsWith("v9Tongue")?350:boss.punchRange;
+   const originX=boss.x+boss.width/2+boss.facing*33;
+   const length=attack?range:range*.34;
+   const fistX=originX+boss.facing*length,armY=boss.y+37;
+   ctx.fillStyle=attack?"#87ab74":"#beaa76";
+   ctx.fillRect(Math.min(originX,fistX),armY,length,14);
+   for(let i=0;i<length;i+=24){
+     ctx.fillStyle=i%48?"#496c58":"#a7ba75";
+     ctx.fillRect(Math.min(originX,fistX)+i,armY+4,12,4);
+   }
+   ctx.fillStyle="#3b634e";ctx.fillRect(fistX-16,armY-13,33,39);
+   ctx.fillStyle="#b7bc78";ctx.fillRect(fistX-12,armY-9,25,12);
+   if(!attack){
+     ctx.strokeStyle="#e7b879";ctx.lineWidth=2;
+     ctx.strokeRect(Math.min(originX,fistX),armY-10,length,34);
+   }
+ }
+ ctx.restore();
+};
+// Legacy red test rectangle enemy becomes a beetle in the final region.
+const baseDrawEnemyV9=drawEnemy;
+drawEnemy=function(){
+ if(currentRoom===0)return baseDrawEnemyV9();
+ if(!enemy.alive)return;
+ const sprite=buildSprite("besouro",Math.floor(v9.time*9)%4);
+ ctx.save();ctx.imageSmoothingEnabled=false;
+ if(enemy.hurtTimer>0)ctx.globalAlpha=.53;
+ const flip=enemy.direction<0;
+ if(flip){
+   ctx.translate(enemy.x+enemy.width,enemy.y);ctx.scale(-1,1);
+   ctx.drawImage(sprite,0,-12,enemy.width+16,enemy.height+24);
+ }else ctx.drawImage(sprite,enemy.x-8,enemy.y-12,enemy.width+16,enemy.height+24);
+ ctx.restore();
+};
+const hudV8=drawHUD;
+drawHUD=function(){
+ if(currentRoom!==1)return hudV8();
+ ctx.save();
+ ctx.fillStyle="rgba(7,18,23,.78)";ctx.fillRect(0,0,WIDTH,53);
+ ctx.textBaseline="middle";ctx.textAlign="left";ctx.font="bold 16px sans-serif";
+ ctx.fillStyle="#e6e8d8";ctx.fillText("TEMPLO DO CHEFE  •  CORRENTES",22,26);
+ ctx.textAlign="right";ctx.fillStyle="#d6e9cf";ctx.font="bold 14px sans-serif";
+ ctx.fillText("VIDA "+mac.hp+"/"+mac.maxHp,WIDTH-24,26);
+ ctx.restore();
+};
+
 const oldDraw=draw;
 draw=function(){
  oldDraw();
