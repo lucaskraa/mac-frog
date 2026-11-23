@@ -77,6 +77,22 @@ if(typeof location!=="undefined"&&new URLSearchParams(location.search).get("dev"
  window.MacFrogV9Dev=Object.freeze({
    ...diagnostic,
    enter:(id)=>{a1LoadNode(id,"left",false);return window.MacFrogV9.info();},
+   // Teste de física real: coloca Mac no espaço livre imediatamente acima
+   // da abertura, sem acionar diretamente a função de transição.
+   preparePhysicalFall:(id)=>{
+     const r=A1.rooms[id];if(!r||!r.v9Shaft)throw Error("Sala sem saída inferior: "+id);
+     mac.waterPower=true;
+     a1LoadNode(id,"left",false);
+     a1RoomGeometry(r);
+     A1.transitionCooldown=0;
+     const cx=(r.v9Shaft.x+r.v9Shaft.x+r.v9Shaft.width)/2;
+     mac.x=cx-mac.width/2;
+     const box={x:mac.x,y:r.height-385,width:mac.width,height:mac.height};
+     if(solids.some(a=>rectsOverlap(a,box)))throw Error("Abertura obstruída acima: "+id);
+     mac.y=box.y;mac.vy=70;mac.vx=0;mac.grounded=false;
+     snapCameraToMac();
+     return {id,expected:r.exits.find(e=>e.side==="bottom")?.dest,x:mac.x,y:mac.y};
+   },
    testDoor:(from,to,withWater=true)=>{
      if(!A1.rooms[from]||!A1.rooms[to])throw Error("Unknown connection");
      const d=A1.rooms[from].exits.find(e=>e.dest===to);
