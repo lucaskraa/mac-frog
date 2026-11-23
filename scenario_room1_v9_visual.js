@@ -277,6 +277,19 @@ function miniDraw(){
    ctx.fillStyle="#ffd1a0";
    for(let i=12;i<reach;i+=32)ctx.fillRect(left+i,b.y+85,14,4);
  }
+ if(b.state==="slamWarn"||b.state==="slam"){
+   const active=b.state==="slam";
+   const areaX=b.x-88,areaY=b.y+5;
+   ctx.fillStyle=active?"rgba(138,227,163,.36)":"rgba(246,178,95,.14)";
+   ctx.fillRect(areaX,areaY,b.w+176,b.h+55);
+   ctx.strokeStyle=active?"#d2f4bd":"#f1b670";ctx.lineWidth=active?5:3;
+   ctx.strokeRect(areaX,areaY,b.w+176,b.h+55);
+   ctx.fillStyle=active?"#b4e7a7":"#edb77f";
+   for(let i=0;i<9;i++){
+     const x=areaX+12+i*43;
+     ctx.fillRect(x,b.y+b.h+8,22,active?13:5);
+   }
+ }
  ctx.restore();
 }
 // The old boss AI remains authoritative; only visuals and the new tongue strike render here.
