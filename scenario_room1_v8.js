@@ -218,7 +218,7 @@
     original.update(dt);
   };
   window.MacFrogV8=Object.freeze({
-    info:()=>({version:A1.mapVersion,current:A1.node,rooms:ids.length,discovered:A1.discovered.size,height:A1.roomHeight}),
+    info:()=>({version:A1.mapVersion,current:A1.node,rooms:ids.length,discovered:A1.discovered.size,height:A1.roomHeight,player:{x:mac.x,y:mac.y},mapOpen:A1.fullMapOpen}),
     validate:()=>{
       const errors=[];
       for(const [id,r] of Object.entries(rooms)){
