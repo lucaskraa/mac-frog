@@ -55,10 +55,12 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
     await page.waitForTimeout(620);
     await page.waitForTimeout(300);
     await page.evaluate(()=>window.MacFrogV10Dev.setEnergy(100));
+    const beforeUltimate=await page.evaluate(()=>window.MacFrogV10.info().stats.abilities);
     await page.keyboard.press('u');
     await page.waitForTimeout(490);
     const final=await page.evaluate(()=>window.MacFrogV10.info());
-    assert(final.energy<1,'Ultimate did not consume energy '+id);
+    assert(final.energy<8,'Ultimate did not consume its resource '+JSON.stringify({id,energy:final.energy}));
+    assert(final.stats.abilities>=beforeUltimate+1,'Ultimate action was not executed '+id);
     if(id==='water'||id==='wind'||id==='colossal'||id==='shadow')await shoot('v10-'+id);
     await page.waitForTimeout(900);
     await page.keyboard.press('t');
