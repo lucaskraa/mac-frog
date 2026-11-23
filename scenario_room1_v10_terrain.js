@@ -277,6 +277,41 @@ function drawDoorFrame(c,room,e,p){
  }
  c.restore();
 }
+const pixelMotifs=new Image();let pixelMotifsReady=false;
+pixelMotifs.decoding="async";
+pixelMotifs.onload=()=>{pixelMotifsReady=true;A1.roomCacheDirty=true;};
+pixelMotifs.onerror=()=>console.warn("V10 authored pixel-art motif PNG failed to decode");
+pixelMotifs.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAA8CAMAAADG+c2+AAAASFBMVEWJl0Z7fUl1cUiMZUF1YkRcYjEvY1SFUjpqVD5cUDpHTy8lUERrPTNVOS9IQDhJMSw8PDo5PSE5LS0pPC4TPTkhLywhJigbGiNici3aAAAKRklEQVR42m2Y2aKsqBJELQUFFAQU+P8/vSuo2t0PfTn71OAQ5hAZmdTyvu+5n/t+vu3d+X/yufdeu9u2Lejsec5rds7w5d13XT5Xe0c7z2d/zhxj4D3v53K+5yaQ/ey6Qbe+vbfcS/R2fp2A4LyCnGB/gON53necAMUrzcN5X87nOU5d+7azyVbu6q36XpzDwmm7zNQVAnz/xduzDeFj3ye4Kz77/ujY8trTe7ueZ2v9/V3ae/Y94vIjh3nk+V0y7p1Oa617sGGxnLfX/YT26BCAIWThva19bxHgk+5eCWKY3s44Jj9Pvv+Ytx+KdSgxxzvG03MEE/Yl8Bh72qBw6HrdED5regynPx8bftblK+y7MX+AOfltHYUVSwn9zsRw3dxhlucJITwvsO9p131a493yn5Uilxzbn7/pDoe1PHM75guvC3/Ltlj7+feu38de5rLYbr1zjiDbEs/dRxfsuq6738+SD47aCTfxBLesdvl/C1eiB7Dc1xXjXQpBauUN5+X+XIYRhx+lD/sp/bqP7bp7CWsfSyip2PTY8lRMYrVQRgm3jzXU+661XKzyyCV/bYa4fgjutpGzXsYodsRxbHEM/LK1L6VrYQ3/LX8USeKUc8YHw4u/BZje47D+ji5uy4GHx8Gnq5daaxgVhunZvdpQl9GAADv4CVpyMivGG5abz6oE6LgHFvQqo4gShvH10sG7tuF4Qu33qN2OvsCXXHsOPvUBeCMFrtcowD76KIP4bEd6I2vEiDObHfWOd9184yH3dWz9uPqIbd/Lsy8Pqew1Bz00p1qdj6o8R7S4uXOhXEwv94IvO609H76Uq7xtRHdcsW53b4mahqqLfdbeXQ6tCsbrPu6KnpAR5l7bfVzX4V+ci/eg8M6PlfKMftzvm696j4sQtjM97eTMgn0h51p67tWYVPwtQ0o8LMnmaO3HcW3lfa/rPpsYY+1OebdyARgrPNi2eN2Ng1McKEdSO0gG6U294XAbo/rNYezTUq7NbXd72xXHJOE58ZAEUo95VMsR7yPWH0GX3AJZozQB5OZcR86t32IZHjeMb0982ps2077yUEqTmrVIxOu9bVeNkqb8VcolZzybhih22dfR2vMgNQbKjJpTet6nsWKdYgv2+bU0kolD3o7rIqKH2yVXWAjgwKguPOB5a0iw8+j2qFiNifx7ryi7nvaPMt65J1fHBaOv2siOl7As2cLUj00OuTKbGWY1vgS7UDWLnaX+MXxd2lSLea01UhXEhRLaLumCu47LbnaBYEt+nk/oqXqf0BVcdMY8ZdiAzPlcZj2imTCyVOUPsUveOC/mU2/pviO8kobE28YrLgTPht6K996ZNBLQdRZ6K08hHHYqWbCtlnp3ofvkVU7Je3ojvBnimd64eBsLB3mm8cnIQEkFBFJ1q+5klzSqBMo8RF9twT5f4IRqvV4oRCzSiHhVarnE8c2yJ3DOpdFnkD7t4aKWnhKCrJseQ1KcQG+JNVepQazUzhajpZLwOqI3uL3kPpJFYpRisuYpbd+CQEBLSXhJWis4Y6wx6OKUfhapQFirAL9xJKjLyD6lNfFG4a0fk3MIg+7YZz6CM9lbDpWsGBsZdkD6RXPFhpB7XCUvrPu++13HQladWT9Q2vjsUs7OpyJJsTMf3pFrUv5wHkC7mWnbMl/JRQQvYhzksbejApdALuBeBpfmnjOK4+n5IiKpCKtXrwKZNP25LApas/nwlTY8lrtRjaXeEJaMrJkIVvQGNP7oMFKctNLi3KPMUCo+TurPXgkgr7Zex+wHahITD2uXVHsySELLOP5Rtj15UpMJXnxLDzEOZMcqbNH88uEBdPeM3sxv7xNv0PUIVm2MRhNvrRO94+Ug0T4kzlufZ0tEUswf4LHBHMTjuG/6/Uz80S/FELLlQpEnApbwulepwUO38ow4akk8kfoA0bjsN3P8AW4Grm/2iig2zzqgj6f0Kl0zrKtJCaUCTx0LiZXDPIGaU+XBREqd6KU/C0mK+USMs6gYdTLjhy19kVEZYseeWN58PiapUYecUNtnVjJkyuHLmECWcRH+IDrE0E/SEEs4fd9Xv0nKgHqUMWKKhqwrsK3NKgYUsgSAQwLQin7LYpQc4QU7waIKT+XCOmqk0SeVQFbpuZXaC2h9RmpUfsh1abkwTBLVqrnKChE+FnjofyjHZA7NDfWOS2uAYCZtBVZX6sUTQ7ThW88T2T/pUS1rEkMcpj5sqNOsFGlXnHrPpFJIinReuVAEayKdPoHHBDp1BtMIoGrQT1/FEMpl1rWjkqdxWMYEBMe34wKw8ZDsafOeDpJCkx4+zGBBbCmNxpcBl3q5KQ84YSSHzFG3ojjr7p/3he6bacUS++/QQPeTvm9mnSOk1rYaM1BRdBfBhSa4h7bQH5t4P5tim6/PQ1JkwrljEjMNPY6+x0vJGnS+c2xRMx3kBMUnZleP6px1NlyF5YvHMKGXhZFrbmjesymOaMQYmjulpzSuzMw3pXpIfVAMADV/MGFicXvoW9M084GfOUzAvLexM/yQZjeHug4tvgKNpCEMaklkNDD9UQs1HmzbDgy8NVvSvuT5Zj1yQtCZbc599i1Cl41HaM6mhGue0x86aaVXI3mswyr6JYV7awx5aCqPPB6e4uX0F5A9G4ujuRs3IwDHSAoZD252/4UASNEEODRuHZE5/h5QC5/bV/lEkVrC0s6uRzAi8W7i0EQE4BbGy+aqCHDRprSOWAibeMBAQxA5Qw4oomaoyA9Z9FN4z7dnbeEQ7D2bPOcg2aUdmXRaVNbn3j291G9WE3UU3lUfKIOYOqgeqtQKqi7v3/aSCaz5724PkQpzjwfbAfT6ODRaHpotUQMpy3HVgFhCY80lotmHcAcRm43c7lfo2L4T4A6KA+19n6Te8dG2WflFVdiPxHioLjCRMXaVWDhfGxldJRoLtwnG77Da/7br0NhqD/oSFwsDBXhtbEcGKVZfv2abv7WrQ9VWr1GrriDbJMC5X9+x0LX5M8CubfAEfJ/swrrogkR/Z1KVOtfr1wY0ozBUoSerS1XzmPXLzIJ+FwDQt1PxOkP57GM+KPjN7wK0Ej25zT7jJk/Mg1EbW7Q39bRSAAxQmJmX73713VtPme5m3vS+ye/fnXdLdmPjzacnIlDKC7uLQ0OI8kJzpbyoT5ICCyyWfi3ULeyps3OZf02A76M8P3QSx1l0kQnmmuMMb4cmS49QjAqj2a1DaudKWT8A/m35EQflwCQPn9gRIdR4nJAJ/dAR2Jlq07cJloapqfLWTD8BaUSeGSF9Ps79XN6pl7nxx8zEbn9Z9u/PINZCjI9mfg0ymuAIHxtaNou1M2RU9Ukpg8Vz6j79AWpL/X5/THBfetvJ7RDmOYgdf6llKgIMQPUN1I7yCchCq3RypEW0+f1wwgajqc/XTESxjgBa/aryKikhIjC0jsj2k7wwbrPUtvAJcXKe+K2atJYx974SB8nN7AB9UvDFXUxdrVwPrxpARBDVzuf2ZW5rSCPDm5SYjov/3v0PBGjlqikr76YAAAAASUVORK5CYII=";
+function paintMotifs(c,room,p){
+ if(!pixelMotifsReady)return;
+ const count=Math.max(1,Math.ceil(room.width/900));
+ const choice=room.v9Theme==="mangue"?[0,3,10]:
+  room.v9Theme==="raizes"?[3,10,0]:
+  room.v9Theme==="templo"?[1,6,9]:
+  room.v9Theme==="cripta"?[4,6,8]:
+  room.v9Theme==="aqueduto"?[9,6,2]:
+  room.v9Theme==="abismo"?[8,10,11]:[6,11,9];
+ for(let i=0;i<count;i++){
+  const index=choice[(i+room.v9Seed)%choice.length],x=280+i*850;
+  const y=clamp(room.height-730-((i*17+room.v9Seed)%180),210,room.height-350);
+  const boxW=286,boxH=288;
+  c.save();
+  c.globalAlpha=.27;
+  // Architectural masonry window: generated scene art has a real clipping boundary
+  // rather than a rectangle pasted directly onto a gameplay platform.
+  c.beginPath();c.moveTo(x,y+boxH);c.lineTo(x,y+62);
+  c.quadraticCurveTo(x+boxW/2,y-35,x+boxW,y+62);
+  c.lineTo(x+boxW,y+boxH);c.closePath();c.clip();
+  c.drawImage(pixelMotifs,(index%4)*20,Math.floor(index/4)*20,20,20,x,y,boxW,boxH);
+  c.restore();
+  c.save();c.globalAlpha=.33;
+  c.strokeStyle=p.rock[3];c.lineWidth=12;
+  c.beginPath();c.moveTo(x,y+boxH);c.lineTo(x,y+62);
+  c.quadraticCurveTo(x+boxW/2,y-35,x+boxW,y+62);
+  c.lineTo(x+boxW,y+boxH);c.stroke();
+  c.restore();
+ }
+}
 const original=a1BuildRoomCache;
 a1BuildRoomCache=function(){
  const r=A1.rooms[A1.node],c=A1.roomCacheCtx;
@@ -285,6 +320,7 @@ a1BuildRoomCache=function(){
  const seed=r.v9Seed||r.width*17;
  c.clearRect(0,0,r.width,r.height);c.imageSmoothingEnabled=false;
  vignetteProps(c,r,p);
+ paintMotifs(c,r,p);
  for(const wall of r.walls)paintTerrain(c,wall,"shrine",r,seed);
  for(const floor of r.floors)paintTerrain(c,floor,"moss",r,seed+floor.x);
  for(const platform of r.platforms) {
@@ -333,7 +369,7 @@ a1BuildRoomCache=function(){
 A1.roomCacheDirty=true;
 window.MacFrogV10Terrain=Object.freeze({
  version:"10.1",themes:Object.keys(PALETTES),materials:["stone","wood","moss","shrine"],
- textureCount:()=>cache.size,licensedPixelsReady:()=>licensedReady,
+ textureCount:()=>cache.size,licensedPixelsReady:()=>licensedReady,motifsReady:()=>pixelMotifsReady,
  validate:()=>({ok:Object.keys(PALETTES).length===7,variants:4,pixelTileSize:TS})
 });
 })();
