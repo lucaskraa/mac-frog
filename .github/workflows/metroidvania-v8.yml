@@ -1,0 +1,40 @@
+name: Mac Frog V8 verification
+on:
+  push:
+    branches:
+      - feature/metroidvania-rebuild-v8
+  pull_request:
+    paths:
+      - 'scenario_room1_v8*.js'
+      - 'area1_*_v8.js'
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/metroidvania-v8.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Static and world progression tests
+        run: node --test tests/area1-v8.test.cjs
+      - name: Install browser tooling
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Headless real-browser test
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/mac-frog-server.log 2>&1 &
+          sleep 2
+          node tests/browser-smoke.cjs
+      - name: Preserve visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-frog-v8-browser-screens
+          path: test-results/
+          if-no-files-found: ignore
