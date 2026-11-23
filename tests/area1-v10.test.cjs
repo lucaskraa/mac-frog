@@ -5,13 +5,15 @@ const root=path.join(__dirname,'..');
 const read=n=>fs.readFileSync(path.join(root,n),'utf8');
 test('V10 compiles and loads after V9 in a single consistent boot path',()=>{
  const idx=read('index.html');
- const a=read('scenario_room1_v10.js'),b=read('scenario_room1_v10_visual.js');
+ const a=read('scenario_room1_v10.js'),b=read('scenario_room1_v10_visual.js'),terrain=read('scenario_room1_v10_terrain.js');
  assert.doesNotThrow(()=>new Function(a));
  assert.doesNotThrow(()=>new Function(b));
- assert(a.length>10000&&b.length>8000);
+ assert.doesNotThrow(()=>new Function(terrain));
+ assert(a.length>10000&&b.length>8000&&terrain.length>10000);
  assert(idx.indexOf("scenario_room1_v9_fx.js")<idx.indexOf("scenario_room1_v10.js"));
  assert(idx.indexOf("scenario_room1_v10.js")<idx.indexOf("scenario_room1_v10_visual.js"));
  assert(idx.includes("+ coreV10 + '\\n\\n' + artV10 +"));
+ assert(idx.includes("+ artV10 + '\\n\\n' + terrainV10 +"));
 });
 test('the original V9, V8 and 17MB legacy game are preserved',()=>{
  for(const f of ['scenario_room1_v9.js','scenario_room1_v9_visual.js','scenario_room1_v9_fx.js',
@@ -37,4 +39,12 @@ test('V10 builds animated per-form, per-state low-resolution strips and avoids n
  assert(s.includes('for(const form of initialForms)for(const action of states)get(form,action)'));
  assert(s.includes('drawMacSprite=function()'));
  assert(!s.includes('dead-cells.png'));
+});
+test('world art uses material-specific, cached pixel tiles without changing collision geometry',()=>{
+ const s=read('scenario_room1_v10_terrain.js');
+ for(const key of ['mangue','raizes','cripta','abismo','ruinas','aqueduto','templo'])assert(s.includes(key));
+ for(const mat of ['wood','shrine','moss','stone'])assert(s.includes(mat));
+ assert(s.includes('a1BuildRoomCache=function()'));
+ assert(s.includes('roomCacheDirty=false'));
+ assert(!s.includes('solids.push('),'visual pass must not mutate collision shapes');
 });
