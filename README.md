@@ -1,34 +1,61 @@
-# Mac Frog — Metroidvania (Área 1, V7)
+# Mac Frog — reconstrução Metroidvania (V8)
 
-O jogo conserva **o personagem, os poderes, os golpes e as animações originais** dentro de `game_v25.html`, enquanto a Área 1 recebe um novo projeto de exploração.
+Jogo 2D em HTML5 Canvas. Esta branch preserva o motor original de animação e combate e substitui a geometria repetitiva da Área 1 por salas feitas com mapas de tiles individuais.
 
-## Como acessar
+## Executar
 
-Abra [Mac Frog](https://lucaskraa.github.io/mac-frog/) (após a publicação da atualização). No jogo, pressione **M** para abrir/fechar o mapa completo; com o mapa aberto, a ação é pausada.
+Abra a versão publicada em [GitHub Pages](https://lucaskraa.github.io/mac-frog/) depois que esta branch for validada e integrada, ou execute um servidor estático local dentro do repositório:
 
-## Nova estrutura
+```bash
+python3 -m http.server 8765
+```
 
-- 43 salas conectadas por 68 passagens bidirecionais reais.
-- Salas em **5 modelos arquitetônicos**: galerias com rotas superiores, poços verticais, câmaras alagadas, encruzilhadas e fortificações.
-- Diferentes profundidades, pontes, plataformas escalonadas, paredes, lacunas e pontos para agarrar.
-- Mapa com **silhuetas das salas**, mostrando verticalidade, conexões, salas descobertas e bloqueios de habilidade.
-- Rotas que se cruzam e circuitos de retorno. **11 salas de uma região inundada** só são alcançáveis depois de obter o poder de água no Santuário.
-- Sai de `entrada` e mantém o caminho ao portão da próxima área.
-- A arte do cenário foi substituída temporariamente por formas feitas por código; recursos gráficos antigos continuam no repositório para uso posterior.
+Acesse http://localhost:8765/. O HTML usa `fetch()`; abrir por `file://` não é suportado.
 
-## Arquivos
+**Controles conhecidos:** A/D ou setas para movimentar; W, seta para cima ou Espaço para pular; C para língua/agarrar; Z para ataque normal; M para mapa; Shift para correr. S ou seta para baixo abre saídas inferiores quando o personagem estiver sobre o portal.
 
-| Arquivo | Função |
+## Estrutura
+
+| Arquivo | Responsabilidade |
 |---|---|
-| `index.html` | Inicializa o motor e injeta V6 + V7 antes do `bootGame()` |
-| `game_v25.html` | Motor e sprites/animações originais, preservados |
-| `scenario_room1_v6.js` | Grafo das salas, combate e integração com o motor |
-| `scenario_room1_v7.js` | Geometria diferenciada, arquitetura visual e novo mapa |
-| `scenario_room1_v5.js` | Versão antiga preservada para recuperação |
-| `assets/` | Recursos gráficos preservados |
+| `game_v25.html` | Motor original, 5 atlases WebP embutidos, animações, habilidades e combate; preservado |
+| `scenario_room1_v6.js` | Compatibilidade com o motor, inimigos, entidades e grafo de conexão |
+| `area1_blueprints_v8.js` | 43 salas com geometrias de tiles escritas separadamente |
+| `area1_connectors_v8.js` | 92 plataformas corretivas explícitas, definidas após teste de alcançabilidade |
+| `scenario_room1_v8.js` | Conversão dos tiles em colisões, portas, câmera, checkpoints e save V8 |
+| `scenario_room1_v8_visual.js` | Renderização provisória do ambiente, portas, minimapa/mapa e HUD |
+| `index.html` | Carregamento do motor original + scripts V8 na ordem correta |
+| `tools/extract-atlases.cjs` | Extração reversível dos cinco atlases WebP originais |
+| `tests/area1-v8.test.cjs` | Testes estáticos, topologia, progressão, renderização simulada e spawns |
+| `tests/browser-smoke.cjs` | Teste real no Chromium de carregamento, movimentação e mapa |
 
-## Verificações
+V7 e os cenários anteriores permanecem no repositório como histórico recuperável, mas não são executados pelo novo `index.html`.
 
-Foram executados testes programáticos de sintaxe e construção das 43 salas, reciprocidade das conexões, existência de plataformas nas saídas verticais, acesso ao poder de água antes dos bloqueios, além da execução das funções de desenho com um contexto Canvas simulado.
+## Exploração
 
-**Importante:** as verificações automáticas não substituem testes reais de jogabilidade em navegador. A física original, altura dos saltos, ações de agarrar, efeitos visuais e carregamento de partidas salvas ainda precisam ser verificados manualmente. Este projeto permanece um protótipo, não o mapa final de um jogo comercial.
+- **43 salas** e **68 conexões bidirecionais** no grafo atual;
+- **13 salas verticais** com mais de uma tela de altura;
+- Portas laterais, superiores e inferiores com coordenadas próprias;
+- Diferenciação entre salas, abismos, plataformas, câmaras inundadas e âncoras para língua;
+- Uma região de **11 salas** bloqueada por habilidade da água;
+- O **Santuário da Água** é alcançável antes de adquirir a habilidade;
+- HUD mais limpo, mapa com descoberta progressiva e sala atual;
+- Estado de exploração V8 salvo separadamente para não destruir o save legado.
+
+## Separar os sprites originais
+
+```bash
+node tools/extract-atlases.cjs
+```
+
+O comando escreve cinco imagens **WebP** em `assets/extracted/`, junto de um manifesto com hashes SHA-256 e metadados das animações. A extração não altera os bytes originais; para evitar duplicação permanente de ~13 MB, o GitHub Actions anexa essas imagens como artefato ZIP em vez de adicioná-las ao código-fonte. O motor continua usando os atlases originais embutidos.
+
+## Verificação
+
+```bash
+node --test tests/area1-v8.test.cjs
+```
+
+O fluxo [Mac Frog V8 verification](https://github.com/lucaskraa/mac-frog/actions) executa esses testes, extrai os atlases e também inicia o jogo real num Chromium headless com capturas.
+
+**Observação:** a V8 é um avanço importante de arquitetura, mas não é uma certificação de que toda a campanha foi completada. Salas e transições precisam de testes de jogabilidade longa, revisão visual de cada ambiente, progressão de todos os itens, verificação manual de segredos e eventual substituição da arte provisória por cenários finais. Não confunda topologia válida com uma campanha integralmente testada.
