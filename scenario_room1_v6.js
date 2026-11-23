@@ -1227,6 +1227,7 @@ window.MacFrogMapV6 = Object.freeze({
     const errors=[];
     for (const [id,r] of Object.entries(A1.rooms)) {
       for (const ex of r.exits) {
+        if (ex.dest === "__NEXT_AREA__") continue;
         const neighbor=A1.rooms[ex.dest];
         if (!neighbor || !neighbor.exits.some(back=>back.dest===id && back.requiresWater===ex.requiresWater)) {
           errors.push(id+" -> "+ex.dest);
