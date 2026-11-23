@@ -183,9 +183,22 @@ function updateMini(dt){
  const direction=mac.x<b.x?-1:1;
  const speed=b.phase===2?2.0:1.0;
  if(b.state==="idle"&&b.timer<=0){
-   b.dir=direction;b.state="warn";b.timer=.72/speed;b.hitOnce=false;
+   b.dir=direction;b.hitOnce=false;b.attackIndex=(b.attackIndex||0)+1;
+   // Predictable but varied: a telegraphed ground slam alternates with charges.
+   const slam=b.phase===2 ? b.attackIndex%2===0 : b.attackIndex%3===0;
+   b.state=slam?"slamWarn":"warn";b.timer=(slam?.85:.72)/speed;
  }else if(b.state==="warn"&&b.timer<=0){
    b.state="charge";b.timer=.48;b.hitOnce=false;
+ }else if(b.state==="slamWarn"&&b.timer<=0){
+   b.state="slam";b.timer=.24;b.hitOnce=false;
+   emit(b.x+b.w/2,b.y+b.h,"#a0d1a9",16);
+ }else if(b.state==="slam"){
+   // Short-range shockwave: entirely avoidable by leaving the marked zone.
+   const area={x:b.x-88,y:b.y+5,width:b.w+176,height:b.h+55};
+   if(!b.hitOnce&&overlap(area,{x:mac.x,y:mac.y,width:mac.width,height:mac.height})){
+     damageMac(b.phase===2?19:13,b.x+b.w/2);b.hitOnce=true;
+   }
+   if(b.timer<=0){b.state="recover";b.timer=.85/speed;}
  }else if(b.state==="charge"){
    const r=rooms[A1.node];
    b.x=clamp(b.x+b.dir*(b.phase===2?490:365)*dt,72,r.width-b.w-72);
