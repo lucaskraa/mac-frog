@@ -161,6 +161,8 @@ A1.rooms = (() => {
     roomById[a].exits.push(makeExit(a,b,sideA));
     roomById[b].exits.push(makeExit(b,a,sideB));
   }
+  // Saída para a próxima área do jogo original, após o portão final.
+  roomById.saida.exits.push({side:"right",dest:"__NEXT_AREA__",from:480,to:900,requiresWater:true});
   A1.mapRoomTotal = defs.length;
   return roomById;
 })();
