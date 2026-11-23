@@ -15,19 +15,28 @@
 (async () => {
   const status = document.getElementById('status');
   try {
-    const [gameResponse, roomResponse, layoutResponse] = await Promise.all([
+    const [gameResponse, roomResponse, blueprintsResponse, connectorsResponse, coreResponse, visualResponse] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
       fetch('./scenario_room1_v6.js', {cache:'no-store'}),
-      fetch('./scenario_room1_v7.js', {cache:'no-store'})
+      fetch('./area1_blueprints_v8.js', {cache:'no-store'}),
+      fetch('./area1_connectors_v8.js', {cache:'no-store'}),
+      fetch('./scenario_room1_v8.js', {cache:'no-store'}),
+      fetch('./scenario_room1_v8_visual.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
     if (!roomResponse.ok) throw new Error('scenario_room1_v6.js não carregou');
-    if (!layoutResponse.ok) throw new Error('scenario_room1_v7.js não carregou');
+    if (!blueprintsResponse.ok) throw new Error('area1_blueprints_v8.js não carregou');
+    if (!connectorsResponse.ok) throw new Error('area1_connectors_v8.js não carregou');
+    if (!coreResponse.ok) throw new Error('scenario_room1_v8.js não carregou');
+    if (!visualResponse.ok) throw new Error('scenario_room1_v8_visual.js não carregou');
 
     let game = await gameResponse.text();
     const roomV6 = await roomResponse.text();
-    const roomV7 = await layoutResponse.text();
+    const blueprintV8 = await blueprintsResponse.text();
+    const connectorsV8 = await connectorsResponse.text();
+    const coreV8 = await coreResponse.text();
+    const visualV8 = await visualResponse.text();
 
     game = game.replace(
       'const WORLD_WIDTH = 3000;',
@@ -46,7 +55,7 @@
 
     game = game.replace(
       bootMarker,
-      '\n' + roomV6 + '\n\n' + roomV7 + '\n\n' + bootMarker
+      '\n' + roomV6 + '\n\n' + blueprintV8 + '\n\n' + connectorsV8 + '\n\n' + coreV8 + '\n\n' + visualV8 + '\n\n' + bootMarker
     );
 
     document.open();
