@@ -359,6 +359,14 @@ if(typeof location!=="undefined"&&new URLSearchParams(location.search).get("dev"
   transform:()=>{const done=toggle();return {done,...info()};},combo:()=>{const done=combo();return {done,...info()};},
   action:(n)=>{const done=special(n);return {done,...info()};},setEnergy:(v)=>state.energy=clamp(v,0,100),
   travel:(id)=>{a1LoadNode(id,"left",false);return info();},
+  prepareMiniPunch:()=>{
+   a1LoadNode("mina","left",false);
+   const m=window.MacFrogV9State.mini;
+   if(!m||!m.alive)throw Error("Mini boss not alive; reset test storage");
+   mac.x=m.x-85;mac.y=m.y+8;mac.facing=1;mac.vx=0;mac.vy=0;
+   state.attack=null;state.form="base";state.transformTimer=0;
+   return {hp:m.hp,player:{x:mac.x,y:mac.y},boss:{x:m.x,y:m.y}};
+  },
   prepareFly:(id)=>{
    const form=TYPES[id];if(!form?.progress)throw Error("unknown fly "+id);
    a1LoadNode(form.progress,"left",false);
