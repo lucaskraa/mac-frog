@@ -3,6 +3,7 @@
 (function installV9Art(){
 "use strict";
 const v9=window.MacFrogV9State,rooms=A1.rooms;
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const P={
  mangue:["#102523","#294139","#52694c","#a2be78","#6a8c72"],
  raizes:["#102b24","#2d4939","#596a43","#b9cf7d","#73946f"],
