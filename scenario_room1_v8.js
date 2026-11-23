@@ -43,8 +43,10 @@
       }
     });
     // Entrances have a small safety ledge; all remaining terrain is explicitly authored.
-    platforms.push({x:150,y:H-2*UNIT,width:230,height:22,style:"wood"});
-    platforms.push({x:W-380,y:H-2*UNIT,width:250,height:22,style:"stone"});
+    // Keep entrances free of low ceilings: start ledges are near the first gaps,
+    // not directly over the player's standing position on either side.
+    platforms.push({x:415,y:H-2*UNIT,width:175,height:22,style:"wood"});
+    platforms.push({x:W-620,y:H-2*UNIT,width:210,height:22,style:"stone"});
     if(room.exits.some(e=>e.side==="top"))platforms.push({x:W-345,y:180,width:275,height:22,style:"shrine"});
     if(room.exits.some(e=>e.side==="bottom"))platforms.push({x:W-360,y:H-3*UNIT,width:270,height:22,style:"wood"});
     room.width=W;room.height=H;room.roomKey=id;room.tiles=grid;
