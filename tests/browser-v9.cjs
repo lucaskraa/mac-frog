@@ -67,10 +67,13 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   await page.evaluate(()=>window.MacFrogV9Dev.mainBoss());
   await page.waitForTimeout(200);
   await page.screenshot({path:path.join(out,'v9-tribal-frog.png')});
+  const chief=await page.evaluate(()=>window.MacFrogV9Dev.checkElasticPhase());
+  assert(chief.warned&&chief.active,'Elastic second phase did not trigger: '+JSON.stringify(chief));
+  await page.screenshot({path:path.join(out,'v9-elastic-attack.png')});
   if(errors.length)throw Error('Unexpected browser errors: '+errors.slice(0,8).join(' | '));
   console.log('V9_BROWSER_OK '+JSON.stringify({rooms:info.rooms,
    directions:links.length,downward,gated,shafts:shafts.length,miniBoss:'defeatable',
-   screenshots:5,errors:0}));
+   screenshots:6,errors:0}));
  }catch(e){
   await page.screenshot({path:path.join(out,'FAILED-v9.png')}).catch(()=>{});
   console.error('V9_BROWSER_FAILED',e.stack||e,errors.slice(0,8));
