@@ -60,7 +60,7 @@
       }
       door.id=id+":"+door.side+":"+door.dest;
     }
-    if(id==="santuario")room.waterFly={x:W-318,y:240};
+    if(id==="santuario")room.waterFly={x:W-318,y:105};
     if(id==="hub")room.checkpoint=true;
     for(const enemyDef of room.enemies||[]) {
       const platform=nearest(room,W*.55,H-200);
@@ -75,6 +75,15 @@
   const ids=Object.keys(rooms).sort(),blues=Object.keys(A1_V8_BLUEPRINTS).sort();
   if(ids.join(",")!==blues.join(","))throw Error("V8 não possui todos os blueprints");
   for(const id of ids)compile(id,A1_V8_BLUEPRINTS[id]);
+  // Fixed, per-room corrective platforms from the movement reachability audit.
+  // Does not generate rooms or change their authored tile geometry.
+  for(const [id,extras] of Object.entries(A1_V8_CONNECTORS)){
+    if(!rooms[id])throw Error("Unknown connector room: "+id);
+    for(const item of extras){
+      if(item[0]==="anchor")rooms[id].anchors.push({x:item[1],y:item[2],grabRange:340,kind:"vine"});
+      else rooms[id].platforms.push({x:item[0],y:item[1],width:item[2],height:20,style:"stone"});
+    }
+  }
 
   // The old collider used the fixed y=760 and y=820 for all areas.
   a1RoomGeometry=function(room){
@@ -167,7 +176,7 @@
       if(currentRoom!==0)return;
       localStorage.setItem(A1_SAVE,JSON.stringify({
         version:8,room:A1.node,discovered:[...A1.discovered],doors:[...A1.usedDoors],
-        x:mac.x,y:mac.y,checkpoint:A1.checkpointNode
+        x:mac.x,y:mac.y,checkpoint:currentCheckpointId===checkpoints[0].id?A1.checkpointNode:"entrada"
       }));
     }catch(e){console.warn("V8 save write",e);}
   }
