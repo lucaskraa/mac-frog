@@ -87,6 +87,14 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.equal(reloaded.unlocked.length,9,'Essences are not persisted');
   assert.equal(reloaded.form,'base','Transforms should start safely after reload');
   assert.equal((await page.evaluate(()=>window.MacFrogV9.validate())).ok,true,'V9 graph broken');
+  // The punch must actually damage a real V9 boss through the original combat
+  // hit detection—not merely change its own animation or score counter.
+  const target=await page.evaluate(()=>window.MacFrogV10Dev.prepareMiniPunch());
+  await page.keyboard.press('j');
+  await page.waitForTimeout(180);
+  const hpAfter=await page.evaluate(()=>window.MacFrogV9.info().mini?.hp);
+  assert(Number.isFinite(hpAfter)&&hpAfter<target.hp,'Mac punch did not hit mini boss: '+JSON.stringify({target,hpAfter}));
+  console.log('V10_REAL_PUNCH_DAMAGE_OK',JSON.stringify({before:target.hp,after:hpAfter}));
   if(errors.length)throw Error('Browser errors: '+errors.slice(0,6).join(' | '));
   console.log('V10_BROWSER_OK',JSON.stringify({forms:ids.length,atlases:meta.atlases,frames:meta.frames,
    abilities:done.stats.abilities,unlocked:done.unlocked.length,screenshots:6,errors:errors.length}));
