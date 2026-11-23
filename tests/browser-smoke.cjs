@@ -72,6 +72,27 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    assert.equal(switched,true,'Water unlock developer inspection failed');
    const gateAfter=await page.evaluate(()=>window.MacFrogV8Dev.inspect('saida'));
    assert(gateAfter.doors.some(d=>d.water),'Unlock must keep the door progression rule');
+   // Every real directional doorway must trigger and land inside valid collision space.
+   // Unlike a graph-only test, this calls the game's actual trigger + room loader in Chromium.
+   const links=await page.evaluate(()=>window.MacFrogMapV6.rooms()
+     .flatMap(room=>room.exits
+       .filter(exit=>exit.to!=='__NEXT_AREA__')
+       .map(exit=>({from:room.id,to:exit.to,water:exit.requiresWater}))));
+   let checked=0,blockedDoors=0;
+   for(const link of links){
+     const result=await page.evaluate(args=>window.MacFrogV8Dev.walkDoor(args.from,args.to,true),link);
+     assert.equal(result.arrived,link.to,'Door did not open: '+JSON.stringify(result));
+     assert.equal(result.collision,false,'Door spawns inside solid: '+JSON.stringify(result));
+     assert.equal(result.inBounds,true,'Door spawns out of bounds: '+JSON.stringify(result));
+     const withoutWater=await page.evaluate(args=>window.MacFrogV8Dev.walkDoor(args.from,args.to,false),link);
+     assert.equal(withoutWater.arrived,link.water?link.from:link.to,
+       'Water requirement failed: '+JSON.stringify(withoutWater));
+     if(link.water)blockedDoors++;
+     checked++;
+   }
+   assert.equal(checked,136,'Expected 68 reciprocal connections = 136 directional doorway tests');
+   assert(blockedDoors>=8,'Expected actual ability-gated door tests');
+   console.log('ALL_V8_DOORS_OK',JSON.stringify({checked,blockedDoors}));
    if(errors.length)throw Error('Browser errors: '+errors.join(' | '));
    console.log('BROWSER_SMOKE_OK',JSON.stringify({initial,moved,withMap,validation}));
  }catch(e){
