@@ -233,6 +233,8 @@
     }
   });
   A1.lastWaterPower=mac.waterPower;
+  // Legacy V6 checkpoint reconciliation uses fixed positions and must not override V8 room saves.
+  A1.bootReconciled=true;
   A1.discovered=new Set(["entrada"]);
   a1LoadNode("entrada","left",false);
 })();
