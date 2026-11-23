@@ -383,32 +383,83 @@ drawBossGate=function(){
  ctx.restore();
 };
 // More recognizable original pixel sprite for the ancestral frog chief.
-function chiefAtlas(){
- const cvs=document.createElement("canvas"),c=cvs.getContext("2d");cvs.width=42;cvs.height=56;
- const p=(color,x,y,w,h)=>{c.fillStyle=color;c.fillRect(x,y,w,h)};
- p("#263e3c",8,6,26,42);p("#4a795a",4,11,34,30);p("#80a66b",9,16,25,23);
- p("#b5c580",12,28,18,16);p("#789e66",8,39,27,8);
- p("#234b48",4,45,14,8);p("#234b48",25,45,13,8);
- p("#ba865e",10,1,22,5);p("#e2bb72",15,0,13,2);
- p("#7d553f",7,0,4,11);p("#d3ae64",5,0,3,7);
- p("#ca965c",34,0,4,11);p("#eed389",36,0,3,6);
- p("#2c4441",6,12,11,9);p("#2c4441",25,12,11,9);
- p("#e5cc82",10,15,5,4);p("#e5cc82",28,15,5,4);
- p("#292c37",12,15,3,3);p("#292c37",29,15,3,3);
- p("#31443a",17,25,10,4);p("#d7bb80",20,29,7,3);
- p("#d6ac6c",15,39,16,5);p("#7e574a",17,43,13,8);
- p("#e6cd92",5,47,11,5);p("#e6cd92",27,47,11,5);
- for(let i=0;i<5;i++){p("#567b5b",8+i*5,24+i%2*3,3,4);}
- p("#ba785e",4,30,4,13);p("#ba785e",36,30,4,13);
+function chiefAtlas(frame=0){
+ // Original 72x88 pixel-art animation sheet: detailed tribal skin, crown,
+ // articulated hands, ornamental armor and six independent breathing poses.
+ const cvs=document.createElement("canvas"),c=cvs.getContext("2d");
+ cvs.width=72;cvs.height=88;c.imageSmoothingEnabled=false;
+ const p=(col,x,y,w,h)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),w,h)};
+ const poly=(col,pts)=>{c.fillStyle=col;c.beginPath();c.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]);c.closePath();c.fill()};
+ const bob=Math.round(Math.sin(frame*Math.PI/3)*2);
+ const move=Math.round(Math.sin(frame*Math.PI/3)*3);
+ // Bent legs / broad amphibian toes preserve a low centre of gravity.
+ poly("#202e31",[[7,64],[27,64],[31,79],[26,85],[4,85],[2,79]]);
+ poly("#27443a",[[45,64],[67,64],[70,83],[51,86],[42,79]]);
+ poly("#426b4b",[[8,68],[27,67],[26,80],[9,82]]);
+ poly("#53815a",[[46,67],[63,67],[64,80],[49,81]]);
+ p("#8bac6d",6,79,22,5);p("#8bac6d",48,79,22,5);
+ for(let i=0;i<4;i++){p("#d0bf88",6+i*6,81,4,5);p("#d0bf88",49+i*6,81,4,5)}
+ // Wide dark outline and heavy body, each patch of color is pixel shaped.
+ poly("#1b3030",[[17,25+bob],[53,24+bob],[64,35+bob],[63,63],[53,76],[18,76],[10,63],[8,40]]);
+ poly("#477253",[[19,29+bob],[52,28+bob],[58,40+bob],[57,63],[49,72],[22,72],[15,63],[14,40+bob]]);
+ poly("#749662",[[25,39+bob],[47,39+bob],[54,58],[47,69],[26,69],[19,58]]);
+ poly("#9eaf77",[[27,47],[47,47],[49,60],[42,67],[29,67],[24,60]]);
+ // Tiny raised skin textures / dorsal markings.
+ for(let i=0;i<12;i++){
+   const x=18+(i*13)%38,y=38+(i*17)%23;
+   p(i%3?"#3e694e":"#688c5b",x,y,2+(i%2),2+(i%3));
+ }
+ // Ribbed shoulder armour.
+ poly("#4c4841",[[10,37+bob],[23,33+bob],[28,40+bob],[20,52],[7,50]]);
+ poly("#745b48",[[49,34+bob],[60,37+bob],[65,49],[51,52],[44,40+bob]]);
+ p("#ba9a65",10,42+bob,15,3);p("#bc986c",49,42+bob,13,3);
+ // Oversized hands, arm movement gives visible animation even at rest.
+ const ly=49+move, ry=47-move;
+ poly("#203c37",[[10,42],[18,43],[14,65+move],[9,75+move],[2,73+move]]);
+ poly("#203c37",[[54,43],[64,42],[69,71-move],[60,75-move],[57,60-move]]);
+ poly("#5b8459",[[10,47],[17,47],[13,67+move],[6,70+move],[4,64+move]]);
+ poly("#6c9462",[[55,47],[62,45],[68,67-move],[61,69-move],[58,60-move]]);
+ p("#c5b07d",4,69+move,11,6);p("#c5b07d",59,68-move,11,6);
+ for(let i=0;i<3;i++){
+   p("#e0cf93",3+i*4,73+move,3,6);
+   p("#e0cf93",60+i*4,72-move,3,6);
+ }
+ // Powerful broad frog head with cheeks and raised eyes.
+ poly("#1b3031",[[4,27+bob],[8,17+bob],[18,12+bob],[53,12+bob],[65,18+bob],[69,34+bob],[61,43+bob],[12,43+bob],[4,36+bob]]);
+ poly("#548357",[[7,26+bob],[13,17+bob],[27,15+bob],[49,15+bob],[62,20+bob],[66,32+bob],[58,39+bob],[14,39+bob],[8,34+bob]]);
+ poly("#86a66a",[[14,25+bob],[27,21+bob],[48,20+bob],[59,26+bob],[58,34+bob],[16,35+bob]]);
+ // Wide mouth, nostrils and glistening underlip.
+ p("#29393a",14,34+bob,44,4);p("#b5b480",19,39+bob,33,3);
+ p("#243532",29,28+bob,3,3);p("#243532",41,28+bob,3,3);
+ // Pupil positions create eye movement; frame 4 blinks.
+ const blink=frame===4;
+ p("#233a39",14,20+bob,14,11);p("#233a39",47,20+bob,14,11);
+ p("#c9bd82",17,21+bob,9,blink?3:8);p("#c9bd82",50,21+bob,9,blink?3:8);
+ if(!blink){p("#292e36",21+(frame%2),23+bob,4,5);p("#292e36",54+(frame%2),23+bob,4,5);}
+ p("#f8e6aa",17,22+bob,3,2);p("#f8e6aa",50,22+bob,3,2);
+ // Ceremonial headband and horn-like crest, unmistakably tribal.
+ p("#8e644b",15,14+bob,42,5);p("#d0b477",20,15+bob,34,3);
+ poly("#ad7852",[[17,15+bob],[14,1+bob],[21,6+bob],[25,15+bob]]);
+ poly("#b88a5e",[[47,15+bob],[53,4+bob],[59,1+bob],[57,16+bob]]);
+ p("#e1c783",18,4+bob,3,8);p("#dfc17a",53,6+bob,4,7);
+ p("#d8ba77",32,9+bob,9,8);
+ p("#6dbcb2",35,10+bob,3,5);
+ // Braided belt, medallion and body rune.
+ p("#4d423b",17,63,39,7);p("#cba567",19,65,35,3);
+ for(let i=0;i<7;i++)p(i%2?"#c9ae73":"#785949",21+i*5,65,3,4);
+ poly("#344f50",[[36,46],[43,54],[36,62],[29,54]]);
+ poly("#9fbc8b",[[36,49],[40,54],[36,59],[32,54]]);
+ p("#e2d394",35,53,3,3);
  return cvs;
 }
-const tribalSprite=chiefAtlas();
+const tribalSprites=Array.from({length:6},(_,i)=>chiefAtlas(i));
 drawBoss=function(){
  if(currentRoom!==1||!boss.alive||boss.defeated)return;
  ctx.save();ctx.imageSmoothingEnabled=false;
- const w=118,h=158,x=boss.x+boss.width/2-w/2,y=boss.y+boss.height-h;
+ const w=148,h=181,x=boss.x+boss.width/2-w/2,y=boss.y+boss.height-h;
+ const frame=boss.state==="v9Tongue"||boss.state==="punchActive"?2:Math.floor(v9.time*6)%6;
  if(boss.hurtTimer>0)ctx.globalAlpha=.55;
- ctx.drawImage(tribalSprite,x,y,w,h);
+ ctx.drawImage(tribalSprites[frame],Math.round(x),Math.round(y),w,h);
  ctx.globalAlpha=1;
  if(["punchTelegraph","punchActive","v9TongueWarn","v9Tongue"].includes(boss.state)){
    const attack=boss.state==="punchActive"||boss.state==="v9Tongue";
