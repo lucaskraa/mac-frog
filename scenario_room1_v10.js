@@ -359,6 +359,18 @@ if(typeof location!=="undefined"&&new URLSearchParams(location.search).get("dev"
   transform:()=>{const done=toggle();return {done,...info()};},combo:()=>{const done=combo();return {done,...info()};},
   action:(n)=>{const done=special(n);return {done,...info()};},setEnergy:(v)=>state.energy=clamp(v,0,100),
   travel:(id)=>{a1LoadNode(id,"left",false);return info();},
+  prepareFly:(id)=>{
+   const form=TYPES[id];if(!form?.progress)throw Error("unknown fly "+id);
+   a1LoadNode(form.progress,"left",false);
+   const f=state.flies.find(x=>x.id===id);
+   if(!f)throw Error("fly unavailable "+id);
+   mac.facing=1;
+   mac.x=f.x-87;
+   mac.y=f.y-mac.height*.44;
+   mac.vx=0;mac.vy=0;mac.grounded=false;
+   snapCameraToMac();
+   return {id,fly:{x:f.x,y:f.y},mac:{x:mac.x,y:mac.y},unlocked:state.unlocked.has(id)};
+  },
   state:()=>({timer:state.transformTimer,attack:state.attack,projectiles:state.projectiles.length,zones:state.zones.length})
  });
 }
