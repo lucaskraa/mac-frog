@@ -34,7 +34,7 @@ test('original animation/game and the complete V8 map are preserved',()=>{
  assert(read('area1_blueprints_v8.js').includes('"mina"'));
 });
 test('V9 includes physically open downward shafts, insect AI and persistent miniboss',()=>{
- const core=read(scripts[0]),art=read(scripts[1]),fx=read(scripts[2]);
+ const core=read(scripts[0]),art=read(scripts[1]),fx=read('scenario_room1_v9_fx.js');
  for(const str of ['r.v9Shaft','a1CheckTransitions=function','a1Transition=function',
    'miniDefeated','mini.hp','saveMini','readMini','window.MacFrogV9']){
    assert(core.includes(str),'Core V9 missing '+str);
