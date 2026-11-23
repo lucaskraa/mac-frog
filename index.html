@@ -10,24 +10,21 @@
   </style>
 </head>
 <body>
-<div id="status">Carregando Mangue das Ruínas...</div>
+<div id="status">Carregando o novo mapa de Mac Frog...</div>
 <script>
 (async () => {
   const status = document.getElementById('status');
   try {
-    const [gameResponse, patchResponse, roomV2Response] = await Promise.all([
+    const [gameResponse, roomResponse] = await Promise.all([
       fetch('./game_v25.html', {cache:'no-store'}),
-      fetch('./cenario1.txt', {cache:'no-store'}),
-      fetch('./scenario_room1_v5.js', {cache:'no-store'})
+      fetch('./scenario_room1_v6.js', {cache:'no-store'})
     ]);
 
     if (!gameResponse.ok) throw new Error('game_v25.html não carregou');
-    if (!patchResponse.ok) throw new Error('cenario1.txt não carregou');
-    if (!roomV2Response.ok) throw new Error('scenario_room1_v5.js não carregou');
+    if (!roomResponse.ok) throw new Error('scenario_room1_v6.js não carregou');
 
     let game = await gameResponse.text();
-    const patch = await patchResponse.text();
-    const roomV2 = await roomV2Response.text();
+    const roomV6 = await roomResponse.text();
 
     game = game.replace(
       'const WORLD_WIDTH = 3000;',
@@ -46,7 +43,7 @@
 
     game = game.replace(
       bootMarker,
-      '\n' + patch + '\n\n' + roomV2 + '\n\n' + bootMarker
+      '\n' + roomV6 + '\n\n' + bootMarker
     );
 
     document.open();
