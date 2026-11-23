@@ -52,6 +52,17 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   for(const shaft of shafts){
    assert(shaft.shaft&&shaft.blockingFloors.length===0,'Blocked physical shaft: '+shaft.id);
   }
+  // Physical fall: start above a genuine gap and let the original gravity,
+  // collisions, event loop and transition system do the work (no direct teleport).
+  for(const start of ['entrada','poco','torre']){
+   const prepared=await page.evaluate(id=>window.MacFrogV9Dev.preparePhysicalFall(id),start);
+   await page.waitForFunction(
+    origin=>window.MacFrogV9.info().room!==origin,{timeout:4800},start
+   );
+   const arrived=await page.evaluate(()=>window.MacFrogV9.info());
+   assert.equal(arrived.room,prepared.expected,
+      'Natural falling descent failed: '+JSON.stringify({prepared,arrived}));
+  }
   await page.evaluate(()=>window.MacFrogV9Dev.enter('mina'));
   await page.waitForTimeout(180);
   await page.screenshot({path:path.join(out,'v9-lacraia.png')});
