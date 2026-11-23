@@ -33,12 +33,23 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.waitForTimeout(400);
   const reset=await page.evaluate(()=>window.MacFrogV10.info());
   assert.equal(reset.attack,null,'Combo does not finish');
+  // Prove that merely standing near a Fly Essence does NOT unlock it,
+  // and that the original tongue action (C) can actually capture it.
+  const fly=await page.evaluate(()=>window.MacFrogV10Dev.prepareFly('wind'));
+  assert.equal(fly.unlocked,false,'Wind essence starts unlocked unexpectedly');
+  await page.waitForTimeout(220);
+  assert.equal((await page.evaluate(()=>window.MacFrogV10.info())).unlocked.includes('wind'),false,
+    'Essence was picked up without tongue interaction');
+  await page.keyboard.press('c');
+  await page.waitForFunction(()=>window.MacFrogV10.info().unlocked.includes('wind'),null,{timeout:2800});
+  await page.evaluate(()=>window.MacFrogV10Dev.travel('entrada'));
   // Real keyboard input for every transformation. One complete special and ultimate
   // cycle is checked per form, not only data registration.
   const ids=forms.filter(f=>f.id!=='base').map(f=>f.id);
   for(const id of ids){
     const granted=await page.evaluate(key=>window.MacFrogV10Dev.grant(key),id);
-    assert.equal(granted,true,'Fly Essence unlock failed for '+id);
+    assert(granted || id==='wind' && (await page.evaluate(()=>window.MacFrogV10.info())).unlocked.includes('wind'),
+      'Fly Essence unlock failed for '+id);
     await page.evaluate(key=>window.MacFrogV10Dev.select(key),id);
     await page.keyboard.press('t');
     await page.waitForFunction(key=>window.MacFrogV10.info().form===key,id,{timeout:3000});
