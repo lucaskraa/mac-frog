@@ -371,19 +371,116 @@
     ctx.fillStyle=vignette;ctx.fillRect(0,0,WIDTH,HEIGHT);
   };
 
-  // Keep old minimap and full-map behavior; label the room archetype on the large map.
-  const drawMapV6=a1DrawMap;
+  // Classic exploration map: hallways are wide, wells are tall, hubs are larger.
+  // Unexplored rooms are silhouettes; visited rooms inherit the biome palette.
   a1DrawMap=function(){
-    drawMapV6();
-    if(!A1.fullMapOpen)return;
-    const current=a1CurrentRoom();
+    if(currentRoom!==0)return;
+    const full=A1.fullMapOpen;
+    const cellsX=10, cellsY=6;
+    const cw=full?Math.min(97,Math.floor((WIDTH-120)/cellsX)):22;
+    const ch=full?Math.min(60,Math.floor((HEIGHT-170)/cellsY)):17;
+    const mapWidth=cw*cellsX+28, mapHeight=ch*cellsY+28;
+    const x0=full?(WIDTH-mapWidth)/2:WIDTH-mapWidth-12;
+    const y0=full?(HEIGHT-mapHeight)/2+12:64;
+    const offset=(r)=>{
+      const [col,row]=r.map;
+      return {x:x0+14+(col+.5)*cw,y:y0+14+(row-1+.5)*ch};
+    };
+    function shape(r){
+      if(r.kind==="shaft")return [cw*.52,ch*.91];
+      if(r.kind==="hub")return [cw*.87,ch*.84];
+      if(r.kind==="flood")return [cw*.94,ch*.44];
+      if(r.kind==="gate")return [cw*.70,ch*.65];
+      return [cw*.94,ch*.51];
+    }
     ctx.save();
-    ctx.fillStyle="#bdcdd1";
-    ctx.textAlign="center";
-    ctx.font="12px sans-serif";
-    ctx.fillText("SETOR: "+current.name+"  •  "+(layoutNames[current.kind]||"exploração")+"  •  rotas horizontais e verticais",WIDTH/2,HEIGHT-55);
-    ctx.fillText("AZUL = passagem com poder de água • M fecha o mapa",WIDTH/2,HEIGHT-36);
+    if(full){
+      ctx.fillStyle="rgba(3,9,16,.97)";
+      ctx.fillRect(0,0,WIDTH,HEIGHT);
+      ctx.fillStyle="#edf1ee";ctx.textAlign="center";ctx.font="bold 23px sans-serif";
+      ctx.fillText("MAC FROG  /  MANGUE DAS RUÍNAS",WIDTH/2,Math.max(35,y0-31));
+      ctx.font="13px sans-serif";ctx.fillStyle="#9cabb4";
+      ctx.fillText("Mapa de exploração  •  M: fechar  •  Passagens azuis exigem poder da água",WIDTH/2,Math.max(54,y0-11));
+    }
+    ctx.fillStyle="rgba(9,17,24,.93)";
+    ctx.fillRect(x0,y0,mapWidth,mapHeight);
+    ctx.strokeStyle="rgba(153,181,192,.23)";
+    ctx.lineWidth=1;ctx.strokeRect(x0+.5,y0+.5,mapWidth-1,mapHeight-1);
+
+    // Corridors and vertical shafts are connected before rooms are drawn.
+    const done=new Set();
+    for(const [id,room] of Object.entries(A1.rooms)){
+      const a=offset(room);
+      for(const ex of room.exits){
+        if(ex.dest==="__NEXT_AREA__")continue;
+        const key=[id,ex.dest].sort().join("/");
+        if(done.has(key))continue;
+        done.add(key);
+        const other=A1.rooms[ex.dest];
+        if(!other)continue;
+        const b=offset(other);
+        const visible=full || A1.discovered.has(id) || A1.discovered.has(ex.dest);
+        if(!visible)continue;
+        ctx.strokeStyle=ex.requiresWater?"#5599b7":"#61757f";
+        ctx.lineWidth=full?8:3;
+        ctx.globalAlpha=full?(ex.requiresWater?.79:.56):.47;
+        ctx.beginPath();
+        ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        ctx.globalAlpha=1;
+        if(full&&ex.requiresWater&&!mac.waterPower){
+          ctx.fillStyle="#9ac9e2";
+          ctx.fillRect((a.x+b.x)/2-3,(a.y+b.y)/2-3,6,6);
+        }
+      }
+    }
+    for(const [id,room] of Object.entries(A1.rooms)){
+      const seen=A1.discovered.has(id);
+      const near=room.exits.some(ex=>A1.discovered.has(ex.dest));
+      if(!full&&!seen&&!near)continue;
+      const pos=offset(room),[rw,rh]=shape(room);
+      const colors=room.biome;
+      ctx.globalAlpha=seen?(id===A1.node?1:.75):(full?.83:.36);
+      ctx.fillStyle=seen?colors.rock:"#1b2833";
+      ctx.fillRect(pos.x-rw/2,pos.y-rh/2,rw,rh);
+      ctx.globalAlpha=1;
+      ctx.strokeStyle=id===A1.node?"#f4edc0":(seen?colors.rim:"#49606c");
+      ctx.lineWidth=id===A1.node?(full?3:2):1;
+      ctx.strokeRect(pos.x-rw/2,pos.y-rh/2,rw,rh);
+      // Tiles make the room silhouette read like an architectural floor plan.
+      if(full&&seen){
+        ctx.fillStyle="rgba(4,9,14,.50)";
+        if(room.kind==="shaft"){
+          ctx.fillRect(pos.x-4,pos.y-rh/2+5,8,rh-10);
+        }else{
+          ctx.fillRect(pos.x-rw/2+5,pos.y-2,rw-10,4);
+        }
+        if(room.checkpoint){ctx.fillStyle="#efc87d";ctx.fillRect(pos.x-4,pos.y-4,8,8);}
+        if(id==="santuario"&&!mac.waterPower){ctx.fillStyle="#80e9ff";ctx.fillRect(pos.x-4,pos.y-4,8,8);}
+      }
+      if(id===A1.node){
+        ctx.fillStyle="#fff8d3";ctx.beginPath();
+        ctx.arc(pos.x,pos.y,full?5:3,0,Math.PI*2);ctx.fill();
+      }
+    }
+    if(full){
+      const room=a1CurrentRoom();
+      ctx.textAlign="center";
+      ctx.fillStyle="#edf0e9";ctx.font="bold 14px sans-serif";
+      ctx.fillText(room.name+" • "+(layoutNames[room.kind]||"exploração"),WIDTH/2,Math.min(HEIGHT-50,y0+mapHeight+26));
+      ctx.fillStyle="#a8bfc5";ctx.font="12px sans-serif";
+      ctx.fillText(A1.discovered.size+" / "+A1.mapRoomTotal+" salas descobertas  ·  claro: explorado  ·  escuro: desconhecido",WIDTH/2,Math.min(HEIGHT-29,y0+mapHeight+45));
+    } else {
+      ctx.textAlign="right";ctx.fillStyle="#c1d8dd";ctx.font="11px sans-serif";
+      ctx.fillText("M  ·  MAPA",WIDTH-13,y0-7);
+    }
     ctx.restore();
+  };
+
+  // Open map stops movement and combat; prevents damage while reading the route.
+  const updateGameV7=update;
+  update=function(dt){
+    if(currentRoom===0&&A1.fullMapOpen)return;
+    updateGameV7(dt);
   };
 
   window.MacFrogMapV7=Object.freeze({
