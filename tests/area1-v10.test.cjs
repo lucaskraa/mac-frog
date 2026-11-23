@@ -51,6 +51,15 @@ test('world art uses material-specific, cached pixel tiles without changing coll
  assert(!s.includes('solids.push('),'visual pass must not mutate collision shapes');
 });
 
+test('all four enemy families have separate transparent PNG animation sequences',()=>{
+ const art=read('scenario_room1_v10_enemies.js');
+ assert.doesNotThrow(()=>new Function(art));
+ for(const role of ['besouro','larva','mosca','Lacraia das Profundezas'])assert(art.includes(role));
+ assert(art.includes('drawMini'));
+ assert(art.includes('frames:4'));
+ assert(read('scenario_room1_v9_visual.js').includes('MacFrogV10EnemyArt?.ready()'));
+ assert(read('index.html').includes("+ parallaxV10 + '\\n\\n' + enemiesV10 +"));
+});
 test('reuses the verified CC0 swamp multi-layer atlases for two appropriate biomes',()=>{
  const p=read('scenario_room1_v10_parallax.js');
  for(const key of ['background','mid-layer-01','mid-layer-02','trees'])assert(p.includes(key));
