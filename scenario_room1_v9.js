@@ -68,6 +68,20 @@ a1LoadNode=function(id,side,preserve){
    else{e.type="spider";e.speed=57;e.damage=8;}
  }
 };
+function spawnFree(r,x,y){
+  return x>=12&&y>=0&&x+mac.width<=r.width-12&&y+mac.height<=r.height-8&&
+    !solids.some(a=>overlap({x,y,width:mac.width,height:mac.height},a));
+}
+function settleArrival(r,x,y){
+  // Prioritize the actual doorway; avoid spawning beneath a ledge or inside masonry.
+  const offsets=[0,-45,45,-90,90,-145,145,-220,220];
+  const heights=[y,8,22,42,74,120,180,255,Math.max(12,r.height-350)];
+  for(const yy of heights)for(const dx of offsets){
+    const xx=clamp(x+dx,14,r.width-mac.width-14);
+    if(spawnFree(r,xx,yy))return {x:xx,y:yy};
+  }
+  return null;
+}
 a1Transition=function(door){
  if(!door)return;
  const from=A1.node,vy=mac.vy;
@@ -80,7 +94,7 @@ a1Transition=function(door){
      const r=rooms[A1.node],back=r&&r.exits.find(e=>e.dest===from&&e.side==="top");
      if(back){
        mac.x=clamp((back.from+back.to)/2-mac.width/2,25,r.width-mac.width-25);
-       mac.y=56;mac.vy=Math.max(100,Math.min(500,vy));mac.grounded=false;
+       mac.y=8;mac.vy=Math.max(100,Math.min(500,vy));mac.grounded=false;
        snapCameraToMac();
      }
    }else if(door.side==="top"){
@@ -89,6 +103,14 @@ a1Transition=function(door){
        mac.x=shaft.x-155;mac.y=r.height-335;mac.vy=0;mac.grounded=false;
        snapCameraToMac();
      }
+   }
+   // Original V8 arrival math may overlap hand-placed stone tiles.
+   const targetRoom=rooms[A1.node];
+   if(targetRoom){
+     const fixed=settleArrival(targetRoom,mac.x,mac.y);
+     if(fixed){mac.x=fixed.x;mac.y=fixed.y;}
+     else console.warn("V9 no safe spawn near entrance",from,A1.node);
+     snapCameraToMac();
    }
  }
 };
