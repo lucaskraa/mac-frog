@@ -6,6 +6,7 @@ const read=n=>fs.readFileSync(path.join(root,n),'utf8');
 const scripts=[
  'scenario_room1_v9.js',
  'scenario_room1_v9_visual.js',
+ 'scenario_room1_v9_backdrop.js',
  'scenario_room1_v9_fx.js'
 ];
 test('V9 scripts compile and are injected into the boot pipeline in order',()=>{
@@ -19,6 +20,7 @@ test('V9 scripts compile and are injected into the boot pipeline in order',()=>{
    assert(position>prev,'Boot order wrong for '+filename);
    prev=position;
  }
+ assert(index.includes('backdropV9 +'), 'V9 original biome backdrops missing');
  assert(index.includes('fxV9 +'), 'V9 FX not injected');
 });
 test('original animation/game and the complete V8 map are preserved',()=>{
