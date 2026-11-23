@@ -150,7 +150,6 @@ function special(index){
  const form=TYPES[state.form],data=index===2?form.ultimate:form.specials[index];
  if(!data)return false;
  if(!cost(data.energy))return false;
- state.stats.abilities++;
  return startAttack({...data,color:form.color},index===2?"ultimate":"special",-1);
 }
 function toggle(){
@@ -272,7 +271,7 @@ update=function(dt){
   }
  }
  if(state.form==="wind"&&mac.vy>115&&(keys.Space||keys.ArrowUp))mac.vy=Math.min(mac.vy,115);
- if(state.form==="water"){
+ if(state.form==="water"&&currentRoom===0){
   const w=A1.rooms[A1.node]?.water||[];
   const pb={x:mac.x,y:mac.y,width:mac.width,height:mac.height};
   if(w.some(f=>overlap(pb,f))&&mac.vy>120)mac.vy=120;
@@ -294,7 +293,7 @@ update=function(dt){
    if(active&&!a.didHit){
     const x=attackBox(a.reach,a.kick?80:66);
     a.didHit=hurtAt(x,a.damage,"combo");
-    if(a.didHit)vfx(x.x+(mac.facing<0?10:a.reach-10),x.y+a.kick?5:25,a.theme||"#d4bd89",7);
+    if(a.didHit)vfx(x.x+(mac.facing<0?10:a.reach-10),x.y+(a.kick?55:25),a.theme||"#d4bd89",7);
    }
   }else if(!a.fired&&a.elapsed>=a.time*.38){
    a.fired=true;activate(a.id);
