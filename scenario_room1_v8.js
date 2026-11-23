@@ -250,6 +250,41 @@
         A1.roomCacheDirty=true;
         return mac.waterPower;
       },
+      // Exercita a transição real, inclusive os triggers verticais, no navegador.
+      // Exclusivo do modo dev; não é uma ação de gameplay normal.
+      walkDoor:(from,to,waterEnabled=false)=>{
+        if(!rooms[from]||!rooms[to])throw Error("Sala inválida: "+from+" / "+to);
+        const door=rooms[from].exits.find(e=>e.dest===to);
+        if(!door)throw Error("Não existe porta: "+from+" -> "+to);
+        mac.waterPower=Boolean(waterEnabled);
+        a1LoadNode(from,"left",false);
+        A1.lastWaterPower=mac.waterPower;
+        a1RoomGeometry(rooms[from]);
+        A1.transitionCooldown=0;
+        // Posiciona a personagem no volume físico exato de ativação da porta.
+        const room=rooms[from],center=(door.from+door.to)/2;
+        if(door.side==="left"){
+          mac.x=0;mac.y=room.height-96-mac.height;
+        }else if(door.side==="right"){
+          mac.x=room.width-mac.width;mac.y=room.height-96-mac.height;
+        }else if(door.side==="top"){
+          mac.x=center-mac.width/2;mac.y=135;
+        }else{
+          mac.x=center-mac.width/2;mac.y=room.height-3*UNIT-mac.height;
+        }
+        mac.grounded=door.side==="bottom";
+        if(door.side==="top")keys.KeyW=true;
+        if(door.side==="bottom")keys.KeyS=true;
+        try{a1CheckTransitions(0.016);}finally{keys.KeyW=false;keys.KeyS=false;}
+        const target=rooms[A1.node];
+        const box={x:mac.x,y:mac.y,width:mac.width,height:mac.height};
+        const collision=solids.some(s=>rectsOverlap(box,s));
+        return {from,to,side:door.side,requiresWater:door.requiresWater,
+          waterEnabled:Boolean(waterEnabled),arrived:A1.node,blocked:A1.node===from,
+          collision,position:{x:mac.x,y:mac.y},
+          inBounds:!!target&&box.x>=0&&box.y>=0&&box.x+box.width<=target.width&&box.y+box.height<=target.height,
+          cooldown:A1.transitionCooldown};
+      },
       inspect:(id=A1.node)=>{
         const room=rooms[id];if(!room)throw Error("Unknown room "+id);
         return {id,width:room.width,height:room.height,doors:room.exits.map(e=>({id:e.id,side:e.side,dest:e.dest,water:e.requiresWater})),
