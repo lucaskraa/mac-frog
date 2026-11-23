@@ -105,8 +105,15 @@
     const x=side==="left"?90:side==="right"?room.width-115:room.width-195;
     let wantedY=room.height-120;
     if(side==="top")wantedY=180;
-    const ledge=nearest(room,x,wantedY);
-    const y=Math.max(12,(ledge?ledge.y:wantedY)-mac.normalHeight-1);
+    let ledge=nearest(room,x,wantedY);
+    if(side==="top"){
+      // Enter from above: spawn ON the highest near-top ledge, not beneath an overhang.
+      const supporting=rectangles(room)
+        .filter(p=>p.x<=x+mac.width&&p.x+p.width>=x&&p.y<=250)
+        .sort((a,b)=>a.y-b.y);
+      if(supporting.length)ledge=supporting[0];
+    }
+    const y=Math.max(4,(ledge?ledge.y:wantedY)-mac.normalHeight-2);
     return {x,y};
   }
   a1EntryPosition=function(room,entryDir){
