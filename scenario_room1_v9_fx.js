@@ -107,7 +107,15 @@ if(typeof location!=="undefined"&&new URLSearchParams(location.search).get("dev"
      return {hp:b.hp,alive:b.alive,stored:window.MacFrogV9.info().miniDefeated};
    },
    mainBoss:()=>{loadRoom(1,"left");mac.x=2510;boss.x=2710;boss.active=true;
-     return {bossX:boss.x,hp:boss.hp,alive:boss.alive};}
+     return {bossX:boss.x,hp:boss.hp,alive:boss.alive};},
+   checkElasticPhase:()=>{
+     if(currentRoom!==1)throw Error("Chief is not in the active area");
+     boss.hp=Math.min(boss.hp,boss.maxHp*.45);boss.state="idle";boss.stateTimer=1;
+     boss.v9TongueCooldown=0;updateBoss(.016);
+     const warned=boss.state==="v9TongueWarn";
+     updateBoss(.55);
+     return {warned,active:boss.state==="v9Tongue",bossState:boss.state};
+   }
  });
 }
 })();
