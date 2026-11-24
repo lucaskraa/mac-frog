@@ -21,10 +21,17 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.keyboard.up('ArrowRight');
    const moved=await page.evaluate(()=>window.MacFrogV8.info());
    assert(moved.player.x>initial.player.x+10,'Player did not move: '+JSON.stringify({initial,moved}));
+   // In V9 the entrance has several elevations; reset to a safe starting ledge.
+   const newer=await page.evaluate(()=>!!window.MacFrogV9);
+   if(newer){
+     await page.evaluate(()=>window.MacFrogV8Dev.enter('entrada'));
+     await page.waitForTimeout(350);
+   }
+   const beforeJump=await page.evaluate(()=>window.MacFrogV8.info());
    await page.keyboard.press('Space');
    await page.waitForTimeout(120);
    const jumped=await page.evaluate(()=>window.MacFrogV8.info());
-   assert(jumped.player.y<moved.player.y-15,'Original jump movement not working');
+   assert(jumped.player.y<beforeJump.player.y-15,'Original jump movement not working');
    await page.keyboard.press('KeyZ');
    await page.keyboard.press('KeyC');
    await page.waitForTimeout(300);
@@ -80,11 +87,11 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
        .map(exit=>({from:room.id,to:exit.to,water:exit.requiresWater}))));
    let checked=0,blockedDoors=0;
    for(const link of links){
-     const result=await page.evaluate(args=>window.MacFrogV8Dev.walkDoor(args.from,args.to,true),link);
+     const result=await page.evaluate(args=>(window.MacFrogV9Dev?window.MacFrogV9Dev.testDoor(args.from,args.to,true):window.MacFrogV8Dev.walkDoor(args.from,args.to,true)),link);
      assert.equal(result.arrived,link.to,'Door did not open: '+JSON.stringify(result));
      assert.equal(result.collision,false,'Door spawns inside solid: '+JSON.stringify(result));
      assert.equal(result.inBounds,true,'Door spawns out of bounds: '+JSON.stringify(result));
-     const withoutWater=await page.evaluate(args=>window.MacFrogV8Dev.walkDoor(args.from,args.to,false),link);
+     const withoutWater=await page.evaluate(args=>(window.MacFrogV9Dev?window.MacFrogV9Dev.testDoor(args.from,args.to,false):window.MacFrogV8Dev.walkDoor(args.from,args.to,false)),link);
      assert.equal(withoutWater.arrived,link.water?link.from:link.to,
        'Water requirement failed: '+JSON.stringify(withoutWater));
      if(link.water)blockedDoors++;

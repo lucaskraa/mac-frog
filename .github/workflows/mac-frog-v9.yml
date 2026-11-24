@@ -1,0 +1,41 @@
+name: Mac Frog V9 verification
+on:
+  push:
+    branches:
+      - feature/mac-frog-v9
+  pull_request:
+    paths:
+      - 'scenario_room1_v9*.js'
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/mac-frog-v9.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Legacy V8 regression and new V9 tests
+        run: |
+          node --test tests/area1-v8.test.cjs
+          node --test tests/area1-v9.test.cjs
+      - name: Install browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Browser V9 and all door transitions
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/mac-frog-v9.log 2>&1 &
+          sleep 2
+          node tests/browser-v9.cjs
+      - name: Upload actual Chromium screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-frog-v9-browser-images
+          path: test-results-v9/
+          if-no-files-found: ignore
